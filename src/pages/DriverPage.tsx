@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useGpsBroadcast } from "@/hooks/useGpsBroadcast";
 
 interface BusOption {
   id: string;
@@ -20,6 +21,7 @@ interface RouteOption {
 
 interface ActiveTrip {
   id: string;
+  busId: string;
   busName: string;
   routeName: string;
   startedAt: string;
@@ -45,7 +47,13 @@ const DriverPage = () => {
   const [starting, setStarting] = useState(false);
   const [ending, setEnding] = useState(false);
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
-  const [pingCount, setPingCount] = useState(0);
+
+  // GPS broadcasting
+  const { pingCount, gpsError, lowBattery, reconnectMsg, cleanup: cleanupGps } = useGpsBroadcast({
+    busId: activeTrip?.busId || "",
+    tripId: activeTripId || "",
+    active: !!activeTripId && !!activeTrip,
+  });
 
   // Fetch profile + buses + routes
   useEffect(() => {
@@ -78,6 +86,7 @@ const DriverPage = () => {
         setActiveTripId(data.id);
         setActiveTrip({
           id: data.id,
+          busId: data.bus_id,
           busName: (data.buses as any)?.name ?? "Unknown Bus",
           routeName: (data.routes as any)?.name ?? "Unknown Route",
           startedAt: data.started_at ?? data.id,
@@ -86,14 +95,6 @@ const DriverPage = () => {
     };
     checkActive();
   }, [user, setActiveTripId]);
-
-  // Ping counter for active trip
-  useEffect(() => {
-    if (!activeTripId) return;
-    setPingCount(0);
-    const interval = setInterval(() => setPingCount((c) => c + 1), 5000);
-    return () => clearInterval(interval);
-  }, [activeTripId]);
 
   const handleStartTrip = async () => {
     if (!user || !selectedBus || !selectedRoute) return;
@@ -117,6 +118,7 @@ const DriverPage = () => {
       setActiveTripId(data.id);
       setActiveTrip({
         id: data.id,
+        busId: selectedBus,
         busName: bus?.name ?? "",
         routeName: route?.name ?? "",
         startedAt: new Date().toISOString(),
@@ -132,6 +134,7 @@ const DriverPage = () => {
     if (!activeTripId) return;
     setEnding(true);
     try {
+      cleanupGps();
       const { error } = await supabase
         .from("trips")
         .update({ status: "completed", ended_at: new Date().toISOString() })
@@ -140,8 +143,7 @@ const DriverPage = () => {
 
       setActiveTripId(null);
       setActiveTrip(null);
-      setPingCount(0);
-      toast({ title: "Trip ended successfully." });
+      toast({ title: "✅ Trip ended successfully" });
     } catch (err: any) {
       toast({ title: "Failed to end trip", description: err.message, variant: "destructive" });
     } finally {
@@ -150,9 +152,10 @@ const DriverPage = () => {
   };
 
   const handleLogout = useCallback(async () => {
+    cleanupGps();
     await signOut();
     navigate("/login", { replace: true });
-  }, [signOut, navigate]);
+  }, [signOut, navigate, cleanupGps]);
 
   const formatTime = (iso: string) => {
     try {
@@ -178,6 +181,13 @@ const DriverPage = () => {
         <p className="text-lg text-foreground">
           {getGreeting()}, <span className="font-semibold">{displayName}</span>
         </p>
+
+        {/* GPS Error */}
+        {gpsError && (
+          <div className="rounded-lg border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {gpsError}
+          </div>
+        )}
 
         {!activeTrip ? (
           /* ========== STATE 1: Before Trip ========== */
@@ -239,6 +249,20 @@ const DriverPage = () => {
             <div className="rounded-lg bg-emerald-600 px-4 py-3 text-center text-white font-semibold text-base">
               🟢 Trip Active
             </div>
+
+            {/* Low battery warning */}
+            {lowBattery && (
+              <div className="rounded-lg bg-amber-500/15 border border-amber-500 px-4 py-2 text-sm text-amber-600 font-medium">
+                ⚠️ Low battery — reduced GPS accuracy
+              </div>
+            )}
+
+            {/* Reconnect message */}
+            {reconnectMsg && (
+              <div className="rounded-lg bg-emerald-500/15 border border-emerald-500 px-4 py-2 text-sm text-emerald-600 font-medium">
+                {reconnectMsg}
+              </div>
+            )}
 
             <div className="space-y-2 rounded-lg border border-border p-4">
               <div className="flex justify-between text-sm">
