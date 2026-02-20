@@ -1,39 +1,42 @@
 
 
-# UniRoute — University Bus Tracking PWA
+# Fix: Exceptions Table INSERT Failing for Drivers
 
-## Overview
-A Progressive Web App for tracking university buses with role-based access for public users, drivers, and admins.
+## Problem
+The delay report form fails because the RLS policies on the `exceptions` table are all **restrictive** (not permissive). In PostgreSQL, when multiple restrictive policies exist, **all** of them must pass. Since a driver is not an admin, the "Admins can insert exceptions" restrictive policy always fails for drivers, blocking their insert -- even though the "Drivers can insert exceptions for their own bus" policy passes.
 
-## 1. Project Foundation
-- Add **Zustand** for state management
-- Configure **PWA manifest** and service worker registration for installability
-- Set up the project folder structure:
-  - `src/lib/` — Supabase client
-  - `src/stores/` — Zustand stores (auth store)
-  - `src/pages/` — Route pages
-  - `src/components/` — Shared components
+## Solution
 
-## 2. Supabase Backend (Lovable Cloud)
-- Enable Lovable Cloud to provision the Supabase backend
-- Create a **profiles** table linked to `auth.users` with auto-creation trigger
-- Create a **user_roles** table with an `app_role` enum (`driver`, `admin`) and a `has_role()` security definer function
-- Enable RLS on both tables with appropriate policies
+### 1. Database Migration: Fix RLS Policies
+Drop the existing restrictive INSERT policies on `exceptions` and recreate them as **permissive** policies. This way, if **any** policy passes (admin OR driver), the insert is allowed.
 
-## 3. Authentication & Auth Store
-- Create a Zustand auth store that manages session state via `onAuthStateChange`
-- Store current user and their role(s)
-- Supabase client initialized at `src/lib/supabase.ts`
+Policies to recreate as permissive:
+- "Admins can insert exceptions" (permissive, `WITH CHECK: has_role(auth.uid(), 'admin')`)
+- "Drivers can insert exceptions for their own bus" (permissive, `WITH CHECK: created_by = auth.uid()`)
 
-## 4. Routing Setup (4 Routes)
-- **`/map`** — Public page (placeholder, no login required)
-- **`/driver`** — Protected route, accessible only to users with `driver` role
-- **`/admin`** — Protected route, accessible only to users with `admin` role
-- **`/login`** — Login page for drivers and admins
-- **`/`** — Redirects to `/map`
-- A **ProtectedRoute** wrapper component that checks auth + role before rendering
+### 2. Code Change: Add console.log Before INSERT
+In `src/pages/DriverPage.tsx`, add a `console.log` of the full payload object right before the `supabase.from("exceptions").insert(...)` call in the `handleReportSubmit` function (around line 181). This logs `bus_id`, `exception_date`, `type`, `notes`, `notified`, and `created_by` for debugging verification.
 
-## 5. Placeholder Pages
-- Each route will render a minimal placeholder (page title only) — no full UI yet
-- Login page will have a basic email/password form wired to Supabase Auth
+---
+
+### Technical Details
+
+**Migration SQL:**
+```text
+DROP POLICY "Admins can insert exceptions" ON public.exceptions;
+DROP POLICY "Drivers can insert exceptions for their own bus" ON public.exceptions;
+
+CREATE POLICY "Admins can insert exceptions"
+  ON public.exceptions FOR INSERT
+  WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
+
+CREATE POLICY "Drivers can insert exceptions for their own bus"
+  ON public.exceptions FOR INSERT
+  WITH CHECK (created_by = auth.uid());
+```
+
+**Code change in DriverPage.tsx (~line 180):**
+- Build a `payload` object with all fields
+- `console.log("Exception payload:", payload)`
+- Pass `payload` to the `.insert()` call
 
