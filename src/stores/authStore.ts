@@ -9,17 +9,20 @@ interface AuthState {
   session: Session | null;
   roles: AppRole[];
   loading: boolean;
+  activeTripId: string | null;
   initialize: () => () => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  setActiveTripId: (id: string | null) => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   session: null,
   roles: [],
   loading: true,
+  activeTripId: null,
 
   initialize: () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -27,7 +30,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ session, user: session?.user ?? null });
 
         if (session?.user) {
-          // Fetch roles outside of the callback to avoid Supabase deadlock
           setTimeout(async () => {
             const { data } = await supabase
               .from("user_roles")
@@ -39,12 +41,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             });
           }, 0);
         } else {
-          set({ roles: [], loading: false });
+          set({ roles: [], loading: false, activeTripId: null });
         }
       }
     );
 
-    // Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) set({ loading: false });
     });
@@ -70,4 +71,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   },
+
+  setActiveTripId: (id) => set({ activeTripId: id }),
 }));
