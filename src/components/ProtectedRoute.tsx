@@ -21,7 +21,10 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     return <Navigate to="/login" replace />;
   }
 
+  // Role-aware redirect: send user to their correct dashboard
   if (!roles.includes(requiredRole)) {
+    if (roles.includes("admin")) return <Navigate to="/admin" replace />;
+    if (roles.includes("driver")) return <Navigate to="/driver" replace />;
     return <Navigate to="/map" replace />;
   }
 
