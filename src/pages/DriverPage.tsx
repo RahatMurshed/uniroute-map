@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGpsBroadcast } from "@/hooks/useGpsBroadcast";
+import { ReportDelaySheet, ISSUE_OPTIONS, type IssueKey } from "@/components/ReportDelaySheet";
 
 interface BusOption {
   id: string;
@@ -48,6 +49,10 @@ const DriverPage = () => {
   const [ending, setEnding] = useState(false);
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
 
+  // Delay state
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [delayReason, setDelayReason] = useState<string | null>(null);
+
   // GPS broadcasting
   const { pingCount, gpsError, lowBattery, reconnectMsg, cleanup: cleanupGps } = useGpsBroadcast({
     busId: activeTrip?.busId || "",
@@ -71,15 +76,15 @@ const DriverPage = () => {
     load();
   }, [user]);
 
-  // Check for existing active trip on mount
+  // Check for existing active trip on mount (also restore delay state)
   useEffect(() => {
     if (!user) return;
     const checkActive = async () => {
       const { data } = await supabase
         .from("trips")
-        .select("id, bus_id, route_id, started_at, buses(name), routes(name)")
+        .select("id, bus_id, route_id, started_at, status, buses(name), routes(name)")
         .eq("driver_id", user.id)
-        .eq("status", "active")
+        .in("status", ["active", "delayed"])
         .limit(1)
         .maybeSingle();
       if (data) {
@@ -91,6 +96,17 @@ const DriverPage = () => {
           routeName: (data.routes as any)?.name ?? "Unknown Route",
           startedAt: data.started_at ?? data.id,
         });
+        if (data.status === "delayed") {
+          // Restore delay banner — fetch the latest exception for context
+          const { data: exc } = await supabase
+            .from("exceptions")
+            .select("notes")
+            .eq("bus_id", data.bus_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          setDelayReason(exc?.notes ?? "Delay reported");
+        }
       }
     };
     checkActive();
@@ -123,6 +139,7 @@ const DriverPage = () => {
         routeName: route?.name ?? "",
         startedAt: new Date().toISOString(),
       });
+      setDelayReason(null);
     } catch (err: any) {
       toast({ title: "Failed to start trip", description: err.message, variant: "destructive" });
     } finally {
@@ -143,11 +160,66 @@ const DriverPage = () => {
 
       setActiveTripId(null);
       setActiveTrip(null);
+      setDelayReason(null);
       toast({ title: "✅ Trip ended successfully" });
     } catch (err: any) {
       toast({ title: "Failed to end trip", description: err.message, variant: "destructive" });
     } finally {
       setEnding(false);
+    }
+  };
+
+  const handleReportSubmit = async (issueKey: IssueKey, notes: string) => {
+    if (!user || !activeTrip || !activeTripId) return;
+
+    const option = ISSUE_OPTIONS.find((o) => o.key === issueKey);
+    const isCancellation = issueKey === "cancel";
+    const combinedNotes = [option?.delayLabel, notes].filter(Boolean).join(" — ");
+
+    try {
+      // Insert exception
+      const { error: excError } = await supabase.from("exceptions").insert({
+        bus_id: activeTrip.busId,
+        exception_date: new Date().toISOString().split("T")[0],
+        type: isCancellation ? "cancellation" : "time_shift",
+        notes: combinedNotes,
+        notified: false,
+        created_by: user.id,
+      });
+      if (excError) throw excError;
+
+      if (isCancellation) {
+        // Cancel trip
+        cleanupGps();
+        await supabase
+          .from("trips")
+          .update({ status: "cancelled", ended_at: new Date().toISOString() })
+          .eq("id", activeTripId);
+        setActiveTripId(null);
+        setActiveTrip(null);
+        setDelayReason(null);
+        toast({ title: "Trip cancelled and reported." });
+      } else {
+        // Mark as delayed
+        await supabase.from("trips").update({ status: "delayed" }).eq("id", activeTripId);
+        setDelayReason(option?.delayLabel ?? "Delay reported");
+        toast({ title: "Delay reported successfully." });
+      }
+
+      setSheetOpen(false);
+    } catch (err: any) {
+      toast({ title: "Failed to submit report. Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handleResolveDelay = async () => {
+    if (!activeTripId) return;
+    try {
+      const { error } = await supabase.from("trips").update({ status: "active" }).eq("id", activeTripId);
+      if (error) throw error;
+      setDelayReason(null);
+    } catch (err: any) {
+      toast({ title: "Failed to resolve delay", variant: "destructive" });
     }
   };
 
@@ -250,6 +322,19 @@ const DriverPage = () => {
               🟢 Trip Active
             </div>
 
+            {/* Delay banner */}
+            {delayReason && (
+              <div className="rounded-lg bg-amber-500/15 border border-amber-500 px-4 py-2">
+                <p className="text-sm text-amber-600 font-medium">⚠️ Delay reported — {delayReason}</p>
+                <button
+                  onClick={handleResolveDelay}
+                  className="mt-1 text-xs font-medium text-emerald-600 hover:underline"
+                >
+                  ✅ Resolved
+                </button>
+              </div>
+            )}
+
             {/* Low battery warning */}
             {lowBattery && (
               <div className="rounded-lg bg-amber-500/15 border border-amber-500 px-4 py-2 text-sm text-amber-600 font-medium">
@@ -297,13 +382,20 @@ const DriverPage = () => {
 
             <Button
               className="w-full bg-amber-500 hover:bg-amber-600 text-white text-lg py-6"
-              onClick={() => toast({ title: "Delay reporting coming soon." })}
+              onClick={() => setSheetOpen(true)}
             >
-              REPORT DELAY ⚠️
+              {delayReason ? "UPDATE DELAY ⚠️" : "REPORT DELAY ⚠️"}
             </Button>
           </div>
         )}
       </main>
+
+      {/* Report Delay Bottom Sheet */}
+      <ReportDelaySheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onSubmit={handleReportSubmit}
+      />
     </div>
   );
 };
