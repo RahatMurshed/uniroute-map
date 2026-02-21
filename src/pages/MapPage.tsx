@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useMapData, type BusLocation, type Stop } from "@/hooks/useMapData";
+import { calculateETAsForStop, recordSpeed, type BusETA } from "@/lib/eta";
 
 const DEFAULT_CENTER: L.LatLngTuple = [23.8103, 90.4125];
 const DEFAULT_ZOOM = 15;
@@ -50,8 +51,34 @@ const MapPage = () => {
   } = useMapData();
 
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
+  const [etas, setEtas] = useState<BusETA[]>([]);
+  const [tickCounter, setTickCounter] = useState(0);
 
   const buses = useMemo(() => [...busLocations.values()], [busLocations]);
+
+  // Record speeds for rolling average whenever bus locations change
+  useEffect(() => {
+    for (const bus of buses) {
+      recordSpeed(bus.busId, bus.speedKmh);
+    }
+  }, [buses]);
+
+  // Recalculate ETAs when buses update or selected stop changes
+  useEffect(() => {
+    if (!selectedStop) {
+      setEtas([]);
+      return;
+    }
+    const results = calculateETAsForStop(selectedStop, buses, routes, stops);
+    setEtas(results);
+  }, [selectedStop, buses, routes, stops]);
+
+  // Tick counter for "last updated X secs ago"
+  useEffect(() => {
+    if (!selectedStop || etas.length === 0) return;
+    const interval = setInterval(() => setTickCounter((c) => c + 1), 1000);
+    return () => clearInterval(interval);
+  }, [selectedStop, etas.length]);
 
   const activeRoutes = useMemo(
     () => routes.filter((r) => (selectedRoute ? r.id === selectedRoute : activeRouteIds.has(r.id))),
@@ -208,15 +235,35 @@ const MapPage = () => {
       <div className="fixed bottom-0 left-0 right-0 z-[1000] p-4 pointer-events-none">
         <div className="pointer-events-auto mx-auto max-w-md rounded-2xl bg-background/95 backdrop-blur-md shadow-lg border border-border p-4">
           {selectedStop ? (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-foreground">{selectedStop.name}</h3>
-                <button onClick={() => setSelectedStop(null)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
+                <div>
+                  <h3 className="font-semibold text-foreground">📍 {selectedStop.name}</h3>
+                  {selectedStop.landmark && (
+                    <p className="text-xs text-muted-foreground">{selectedStop.landmark}</p>
+                  )}
+                </div>
+                <button onClick={() => { setSelectedStop(null); setTickCounter(0); }} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1">✕</button>
               </div>
-              {selectedStop.landmark && (
-                <p className="text-xs text-muted-foreground">{selectedStop.landmark}</p>
+
+              {etas.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">This stop is not served today</p>
+              ) : (
+                <div className="space-y-2 mt-1">
+                  {etas.map((eta) => (
+                    <div key={eta.busId} className="rounded-lg bg-muted/50 px-3 py-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-foreground">🚌 {eta.busName}</span>
+                        <span className="text-xs text-muted-foreground">Route: {eta.routeName}</span>
+                      </div>
+                      <p className="text-sm mt-0.5">{eta.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Last updated: {Math.floor((Date.now() - new Date(eta.timestamp).getTime()) / 1000)}s ago
+                      </p>
+                    </div>
+                  ))}
+                </div>
               )}
-              <p className="text-sm text-muted-foreground italic">Calculating ETA...</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center">Tap a stop to see bus ETA</p>
