@@ -148,7 +148,7 @@ Deno.serve(async (req) => {
 
     if (type === "exception") {
       // Called when exception is created
-      const { bus_id, bus_name, exception_type, time_offset_mins, route_id } = data;
+      const { bus_id, bus_name, exception_type, time_offset_mins, route_id, notes } = data;
 
       // Find subscriptions for this route
       const { data: subs } = await supabase
@@ -168,9 +168,15 @@ Deno.serve(async (req) => {
       if (exception_type === "cancellation") {
         title = "Bus Cancelled ❌";
         body = `${bus_name} is cancelled today`;
-      } else if (exception_type === "delay") {
+      } else if (exception_type === "delay" || exception_type === "time_shift") {
         title = "Bus Running Late ⚠️";
-        body = `${bus_name} delayed by ${time_offset_mins ?? "?"} minutes`;
+        if (notes) {
+          body = `${bus_name} is delayed — ${notes}`;
+        } else if (time_offset_mins) {
+          body = `${bus_name} delayed by ${time_offset_mins} minutes`;
+        } else {
+          body = `${bus_name} is running late`;
+        }
       } else if (exception_type === "route_change") {
         title = "Route Changed 🔄";
         body = `${bus_name} is on a different route today`;

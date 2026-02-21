@@ -214,6 +214,7 @@ const DriverPage = () => {
                 exception_type: isCancellation ? "cancellation" : "time_shift",
                 time_offset_mins: null,
                 route_id: routeId,
+                notes: combinedNotes,
               },
             });
             await supabase
