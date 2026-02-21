@@ -19,6 +19,7 @@ export interface OverrideRecord {
   createdByName: string | null;
   createdAt: string;
   defaultRouteId: string | null;
+  isDriverCreated: boolean;
 }
 
 export interface BusOption {
@@ -55,6 +56,18 @@ export function useOverrides() {
       return;
     }
 
+    // Fetch driver role user IDs to determine isDriverCreated
+    const creatorIds = [...new Set((data ?? []).map((e: any) => e.created_by))];
+    let driverUserIds = new Set<string>();
+    if (creatorIds.length > 0) {
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "driver")
+        .in("user_id", creatorIds);
+      driverUserIds = new Set((roles ?? []).map((r) => r.user_id));
+    }
+
     setOverrides(
       (data ?? []).map((e: any) => ({
         id: e.id,
@@ -72,6 +85,7 @@ export function useOverrides() {
         createdByName: e.profiles?.display_name ?? null,
         createdAt: e.created_at,
         defaultRouteId: e.buses?.default_route_id ?? null,
+        isDriverCreated: driverUserIds.has(e.created_by),
       }))
     );
   }, []);

@@ -187,8 +187,44 @@ const DriverPage = () => {
         created_by: user.id,
       };
       console.log("Exception payload:", payload);
-      const { error: excError } = await supabase.from("exceptions").insert(payload);
+      const { data: inserted, error: excError } = await supabase
+        .from("exceptions")
+        .insert(payload)
+        .select("id")
+        .single();
       if (excError) throw excError;
+
+      // Immediately notify students via push notifications
+      if (inserted) {
+        // Find route_id from the active trip
+        const { data: tripData } = await supabase
+          .from("trips")
+          .select("route_id")
+          .eq("id", activeTripId)
+          .single();
+        const routeId = tripData?.route_id;
+
+        if (routeId) {
+          try {
+            await supabase.functions.invoke("send-push-notifications", {
+              body: {
+                type: "exception",
+                bus_id: activeTrip.busId,
+                bus_name: activeTrip.busName,
+                exception_type: isCancellation ? "cancellation" : "time_shift",
+                time_offset_mins: null,
+                route_id: routeId,
+              },
+            });
+            await supabase
+              .from("exceptions")
+              .update({ notified: true })
+              .eq("id", inserted.id);
+          } catch (pushErr) {
+            console.error("Push notification failed:", pushErr);
+          }
+        }
+      }
 
       if (isCancellation) {
         // Cancel trip
@@ -200,12 +236,12 @@ const DriverPage = () => {
         setActiveTripId(null);
         setActiveTrip(null);
         setDelayReason(null);
-        toast({ title: "Trip cancelled and reported." });
+        toast({ title: "✅ Trip cancelled and students notified" });
       } else {
         // Mark as delayed
         await supabase.from("trips").update({ status: "delayed" }).eq("id", activeTripId);
         setDelayReason(option?.delayLabel ?? "Delay reported");
-        toast({ title: "Delay reported successfully." });
+        toast({ title: "✅ Delay reported and students notified" });
       }
 
       setSheetOpen(false);
