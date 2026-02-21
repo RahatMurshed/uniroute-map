@@ -53,7 +53,7 @@ export function useAdminData() {
     // Get active/delayed trips
     const { data: trips } = await supabase
       .from("trips")
-      .select("id, bus_id, route_id, status, driver_id, routes(name), profiles!trips_driver_id_fkey(display_name)")
+      .select("id, bus_id, route_id, status, driver_id, routes(name), driver:profiles!trips_driver_id_fkey(display_name)")
       .in("status", ["active", "delayed"]);
 
     const tripByBus = new Map<string, { id: string; routeId: string; routeName: string; status: string; driverName: string | null }>();
@@ -64,7 +64,7 @@ export function useAdminData() {
           routeId: t.route_id,
           routeName: (t.routes as any)?.name ?? "Unknown",
           status: t.status,
-          driverName: (t.profiles as any)?.display_name ?? null,
+          driverName: (t.driver as any)?.display_name ?? null,
         });
       }
     }
@@ -138,12 +138,12 @@ export function useAdminData() {
   const fetchStats = useCallback(async () => {
     const [busRes, activeRes, delayedRes] = await Promise.all([
       supabase.from("buses").select("id", { count: "exact", head: true }),
-      supabase.from("trips").select("id", { count: "exact", head: true }).eq("status", "active"),
+      supabase.from("trips").select("id", { count: "exact", head: true }).in("status", ["active", "delayed"]),
       supabase.from("trips").select("id", { count: "exact", head: true }).eq("status", "delayed"),
     ]);
 
     // Students on bus for active trips
-    const { data: activeTrips } = await supabase.from("trips").select("id").eq("status", "active");
+    const { data: activeTrips } = await supabase.from("trips").select("id").in("status", ["active", "delayed"]);
     let studentCount = 0;
     if (activeTrips && activeTrips.length > 0) {
       const { count } = await supabase
