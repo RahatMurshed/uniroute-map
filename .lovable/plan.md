@@ -1,27 +1,48 @@
 
-
-# Fix: NotificationSheet Hidden Behind Map
+# Fix: Driver Name From Active Trip Instead of Bus Assignment
 
 ## Problem
 
-When clicking the bell button, `setNotifSheetOpen(true)` IS being called, but the NotificationSheet is invisible because it renders behind the Leaflet map layer.
-
-- The top bar uses `z-[1000]`
-- Leaflet map tiles and overlays use z-indices in the 200-800 range
-- The NotificationSheet backdrop uses `z-40` and the sheet uses `z-50`
-- Result: the sheet opens but is completely hidden behind the map
+The `fetchBuses` function in `useAdminData.ts` gets the driver name from `buses.driver_id -> profiles.display_name` (line 49, 97). This shows the **assigned** driver, not the driver **currently driving**. When a trip is active, the actual driver is recorded on `trips.driver_id`, which may differ.
 
 ## Solution
 
-Update the z-index values in `src/components/NotificationSheet.tsx` to be higher than the map:
+Update the trips query (line 54-57) to also fetch the driver's profile, then use that name instead.
 
-### File: `src/components/NotificationSheet.tsx`
+### File: `src/hooks/useAdminData.ts`
 
-**Line ~54 (backdrop):** Change `z-40` to `z-[2000]`
+**1. Update the trips query (line 54-57)** to include the driver profile:
 
-**Line ~58 (sheet):** Change `z-50` to `z-[2001]`
+```ts
+const { data: trips } = await supabase
+  .from("trips")
+  .select("id, bus_id, route_id, status, driver_id, routes(name), profiles!trips_driver_id_fkey(display_name)")
+  .in("status", ["active", "delayed"]);
+```
 
-This ensures both the backdrop overlay and the bottom sheet render above all map layers and the top bar.
+**2. Update the tripByBus map (lines 59-69)** to store the driver name:
 
-No other files need changes.
+```ts
+const tripByBus = new Map<string, {
+  id: string; routeId: string; routeName: string; status: string; driverName: string | null;
+}>();
+if (trips) {
+  for (const t of trips) {
+    tripByBus.set(t.bus_id, {
+      id: t.id,
+      routeId: t.route_id,
+      routeName: (t.routes as any)?.name ?? "Unknown",
+      status: t.status,
+      driverName: (t.profiles as any)?.display_name ?? null,
+    });
+  }
+}
+```
 
+**3. Update the mapping (line 97)** to prefer the trip's driver over the bus's assigned driver:
+
+```ts
+driverName: trip?.driverName ?? (b.profiles as any)?.display_name ?? null,
+```
+
+This way, if there is an active/delayed trip, the driver shown is whoever started that trip. If no active trip exists, it falls back to the bus's assigned driver.
