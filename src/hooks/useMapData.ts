@@ -28,6 +28,7 @@ interface RouteInfo {
   name: string;
   colorHex: string;
   stopSequence: string[] | null;
+  activeDays: number[] | null;
 }
 
 /** Parse stop_sequence JSONB – handles both flat string[] and object[] with stop_id */
@@ -56,10 +57,10 @@ export function useMapData() {
     const load = async () => {
       const [stopsRes, routesRes] = await Promise.all([
         supabase.from("stops").select("id, name, lat, lng, landmark"),
-        supabase.from("routes").select("id, name, color_hex, stop_sequence"),
+        supabase.from("routes").select("id, name, color_hex, stop_sequence, active_days"),
       ]);
       if (stopsRes.data) setStops(stopsRes.data.map((s) => ({ id: s.id, name: s.name, lat: Number(s.lat), lng: Number(s.lng), landmark: s.landmark })));
-      if (routesRes.data) setRoutes(routesRes.data.map((r) => ({ id: r.id, name: r.name, colorHex: r.color_hex ?? "#3b82f6", stopSequence: parseStopSequence(r.stop_sequence) })));
+      if (routesRes.data) setRoutes(routesRes.data.map((r) => ({ id: r.id, name: r.name, colorHex: r.color_hex ?? "#3b82f6", stopSequence: parseStopSequence(r.stop_sequence), activeDays: r.active_days ?? null })));
     };
     load();
   }, []);
