@@ -3,9 +3,20 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useMapData, type BusLocation, type Stop } from "@/hooks/useMapData";
 import { calculateETAsForStop, recordSpeed, type BusETA } from "@/lib/eta";
+import ScheduleView from "@/components/ScheduleView";
 
 const DEFAULT_CENTER: L.LatLngTuple = [23.8103, 90.4125];
 const DEFAULT_ZOOM = 15;
+
+type TabId = "map" | "schedule";
+
+function getInitialTab(): TabId {
+  try {
+    const saved = localStorage.getItem("uniroute-tab");
+    if (saved === "schedule") return "schedule";
+  } catch {}
+  return "map";
+}
 
 function timeAgo(ts: string) {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
@@ -40,6 +51,8 @@ const MapPage = () => {
   const stopMarkersRef = useRef<L.Marker[]>([]);
   const polylinesRef = useRef<L.Polyline[]>([]);
 
+  const [activeTab, setActiveTab] = useState<TabId>(getInitialTab);
+
   const {
     busLocations,
     stops,
@@ -55,6 +68,11 @@ const MapPage = () => {
   const [tickCounter, setTickCounter] = useState(0);
 
   const buses = useMemo(() => [...busLocations.values()], [busLocations]);
+
+  const handleTabChange = useCallback((tab: TabId) => {
+    setActiveTab(tab);
+    try { localStorage.setItem("uniroute-tab", tab); } catch {}
+  }, []);
 
   // Record speeds for rolling average whenever bus locations change
   useEffect(() => {
@@ -139,7 +157,6 @@ const MapPage = () => {
     const map = mapRef.current;
     if (!map) return;
 
-    // Clear old
     stopMarkersRef.current.forEach((m) => m.remove());
     stopMarkersRef.current = [];
 
@@ -189,87 +206,127 @@ const MapPage = () => {
   }, [buses]);
 
   return (
-    <div className="fixed inset-0 z-0">
-      {/* Map container */}
-      <div ref={containerRef} className="h-full w-full" />
+    <div className="fixed inset-0 z-0 flex flex-col">
+      {/* ── Content area ── */}
+      <div className="flex-1 relative overflow-hidden">
+        {/* Map view (always rendered to keep state) */}
+        <div className={activeTab === "map" ? "h-full w-full" : "hidden"}>
+          <div ref={containerRef} className="h-full w-full" />
 
-      {/* ── Top bar ── */}
-      <div className="fixed top-0 left-0 right-0 z-[1000] flex items-center justify-between px-4 py-3 pointer-events-none">
-        <div className="pointer-events-auto rounded-xl bg-background/90 backdrop-blur-md shadow-lg px-4 py-2">
-          <span className="text-lg font-bold text-foreground">UniRoute 🚌</span>
-        </div>
+          {/* ── Top bar ── */}
+          <div className="fixed top-0 left-0 right-0 z-[1000] flex items-center justify-between px-4 py-3 pointer-events-none">
+            <div className="pointer-events-auto rounded-xl bg-background/90 backdrop-blur-md shadow-lg px-4 py-2">
+              <span className="text-lg font-bold text-foreground">UniRoute 🚌</span>
+            </div>
 
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <div className={`rounded-full px-3 py-1 text-xs font-medium shadow-md ${
-            connected
-              ? "bg-emerald-500/90 text-white"
-              : "bg-destructive/90 text-destructive-foreground"
-          }`}>
-            {connected ? "🟢 Live" : "🔴 Reconnecting..."}
-          </div>
-
-          <select
-            value={selectedRoute ?? ""}
-            onChange={(e) => setSelectedRoute(e.target.value || null)}
-            className="rounded-xl bg-background/90 backdrop-blur-md shadow-lg border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            <option value="">All Routes</option>
-            {routes.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* ── No active buses banner ── */}
-      {buses.length === 0 && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[1000] rounded-xl bg-secondary/95 backdrop-blur-md shadow-lg px-5 py-3 text-center max-w-xs">
-          <p className="text-sm text-secondary-foreground">
-            No buses currently active.<br />
-            <span className="text-muted-foreground text-xs">Check back during service hours.</span>
-          </p>
-        </div>
-      )}
-
-      {/* ── Bottom info card ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-[1000] p-4 pointer-events-none">
-        <div className="pointer-events-auto mx-auto max-w-md rounded-2xl bg-background/95 backdrop-blur-md shadow-lg border border-border p-4">
-          {selectedStop ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-foreground">📍 {selectedStop.name}</h3>
-                  {selectedStop.landmark && (
-                    <p className="text-xs text-muted-foreground">{selectedStop.landmark}</p>
-                  )}
-                </div>
-                <button onClick={() => { setSelectedStop(null); setTickCounter(0); }} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1">✕</button>
+            <div className="flex items-center gap-2 pointer-events-auto">
+              <div className={`rounded-full px-3 py-1 text-xs font-medium shadow-md ${
+                connected
+                  ? "bg-emerald-500/90 text-white"
+                  : "bg-destructive/90 text-destructive-foreground"
+              }`}>
+                {connected ? "🟢 Live" : "🔴 Reconnecting..."}
               </div>
 
-              {etas.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">
-                  {buses.length === 0 ? "No buses currently active" : "No active buses heading to this stop"}
-                </p>
-              ) : (
-                <div className="space-y-2 mt-1">
-                  {etas.map((eta) => (
-                    <div key={eta.busId} className="rounded-lg bg-muted/50 px-3 py-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-foreground">🚌 {eta.busName}</span>
-                        <span className="text-xs text-muted-foreground">Route: {eta.routeName}</span>
-                      </div>
-                      <p className="text-sm mt-0.5">{eta.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Last updated: {Math.floor((Date.now() - new Date(eta.timestamp).getTime()) / 1000)}s ago
-                      </p>
+              <select
+                value={selectedRoute ?? ""}
+                onChange={(e) => setSelectedRoute(e.target.value || null)}
+                className="rounded-xl bg-background/90 backdrop-blur-md shadow-lg border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">All Routes</option>
+                {routes.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* ── No active buses banner ── */}
+          {buses.length === 0 && (
+            <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[1000] rounded-xl bg-secondary/95 backdrop-blur-md shadow-lg px-5 py-3 text-center max-w-xs">
+              <p className="text-sm text-secondary-foreground">
+                No buses currently active.<br />
+                <span className="text-muted-foreground text-xs">Check back during service hours.</span>
+              </p>
+            </div>
+          )}
+
+          {/* ── Bottom info card ── */}
+          <div className="absolute bottom-0 left-0 right-0 z-[1000] p-4 pointer-events-none">
+            <div className="pointer-events-auto mx-auto max-w-md rounded-2xl bg-background/95 backdrop-blur-md shadow-lg border border-border p-4">
+              {selectedStop ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-foreground">📍 {selectedStop.name}</h3>
+                      {selectedStop.landmark && (
+                        <p className="text-xs text-muted-foreground">{selectedStop.landmark}</p>
+                      )}
                     </div>
-                  ))}
+                    <button onClick={() => { setSelectedStop(null); setTickCounter(0); }} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1">✕</button>
+                  </div>
+
+                  {etas.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic">
+                      {buses.length === 0 ? "No buses currently active" : "No active buses heading to this stop"}
+                    </p>
+                  ) : (
+                    <div className="space-y-2 mt-1">
+                      {etas.map((eta) => (
+                        <div key={eta.busId} className="rounded-lg bg-muted/50 px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-foreground">🚌 {eta.busName}</span>
+                            <span className="text-xs text-muted-foreground">Route: {eta.routeName}</span>
+                          </div>
+                          <p className="text-sm mt-0.5">{eta.label}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Last updated: {Math.floor((Date.now() - new Date(eta.timestamp).getTime()) / 1000)}s ago
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center">Tap a stop to see bus ETA</p>
               )}
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center">Tap a stop to see bus ETA</p>
-          )}
+          </div>
+        </div>
+
+        {/* Schedule view */}
+        {activeTab === "schedule" && (
+          <div className="h-full overflow-y-auto">
+            <ScheduleView busLocations={busLocations} stops={stops} routes={routes} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Bottom navigation bar ── */}
+      <div className="shrink-0 border-t border-border bg-background/95 backdrop-blur-md z-[1001]">
+        <div className="flex">
+          <button
+            onClick={() => handleTabChange("map")}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
+              activeTab === "map"
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <span className="text-lg">🗺️</span>
+            <span>Live Map</span>
+          </button>
+          <button
+            onClick={() => handleTabChange("schedule")}
+            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
+              activeTab === "schedule"
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <span className="text-lg">📋</span>
+            <span>Schedule</span>
+          </button>
         </div>
       </div>
     </div>
