@@ -30,6 +30,17 @@ interface RouteInfo {
   stopSequence: string[] | null;
 }
 
+/** Parse stop_sequence JSONB – handles both flat string[] and object[] with stop_id */
+function parseStopSequence(raw: unknown): string[] | null {
+  if (!raw || !Array.isArray(raw)) return null;
+  if (raw.length === 0) return null;
+  if (typeof raw[0] === "string") return raw as string[];
+  // Object format: [{stop_id: "...", scheduled_time: "..."}, ...]
+  return raw
+    .map((item: any) => item?.stop_id as string | undefined)
+    .filter(Boolean) as string[];
+}
+
 export function useMapData() {
   const [busLocations, setBusLocations] = useState<Map<string, BusLocation>>(new Map());
   const [stops, setStops] = useState<Stop[]>([]);
@@ -48,7 +59,7 @@ export function useMapData() {
         supabase.from("routes").select("id, name, color_hex, stop_sequence"),
       ]);
       if (stopsRes.data) setStops(stopsRes.data.map((s) => ({ id: s.id, name: s.name, lat: Number(s.lat), lng: Number(s.lng), landmark: s.landmark })));
-      if (routesRes.data) setRoutes(routesRes.data.map((r) => ({ id: r.id, name: r.name, colorHex: r.color_hex ?? "#3b82f6", stopSequence: r.stop_sequence as string[] | null })));
+      if (routesRes.data) setRoutes(routesRes.data.map((r) => ({ id: r.id, name: r.name, colorHex: r.color_hex ?? "#3b82f6", stopSequence: parseStopSequence(r.stop_sequence) })));
     };
     load();
   }, []);
