@@ -1,58 +1,58 @@
 
-# Fix: Delete Route Still Failing on Foreign Key Constraint
+
+# Fix: Add Missing RLS Policies for Route Deletion
 
 ## Root Cause
 
-The `live_locations` delete uses Supabase's `.in('trip_id', tripIds)` which has a default row limit of 1000. If a trip has accumulated many GPS pings, the delete may not remove all `live_locations` rows in a single call, leaving behind rows that block the trip deletion.
+The `live_locations` and `students_on_bus` tables are missing RLS DELETE policies for admins. When the delete function runs:
 
-Additionally, the `students_on_bus` table also has a `trip_id` column which could be another foreign key constraint blocker that isn't being handled.
+1. `supabase.from("live_locations").delete().eq("trip_id", tripId)` silently deletes **zero rows** (RLS blocks it)
+2. The call returns status 204 with no error (this is how Supabase RLS works -- it filters, not errors)
+3. When `trips` deletion runs, the `live_locations` rows still exist, causing the FK constraint error
 
 ## Solution
 
-Update `deleteRoute` in `src/hooks/useRouteManager.ts` to:
+### Step 1: Database Migration
 
-1. Delete `live_locations` in batches or one trip at a time to avoid the 1000-row limit
-2. Also delete `students_on_bus` records for those trips before deleting the trips
-3. Process each trip individually to ensure complete cleanup
+Add RLS DELETE policies so admins can clean up dependent records:
 
-### Updated deletion order:
+```sql
+-- Allow admins to delete live_locations
+CREATE POLICY "Admins can delete live_locations"
+  ON public.live_locations
+  FOR DELETE
+  USING (has_role(auth.uid(), 'admin'::app_role));
 
-```
-Step 1: Check for active/delayed trips (unchanged)
-Step 2: Get completed/cancelled trip IDs (unchanged)
-Step 3: For each trip ID, delete live_locations one trip at a time
-Step 4: Delete students_on_bus for those trip IDs
-Step 5: Delete exceptions for linked buses (unchanged)
-Step 6: Delete the trips
-Step 7: Delete the route
-```
+-- Allow admins to select students_on_bus (needed for .in() filter)
+CREATE POLICY "Admins can read students_on_bus"
+  ON public.students_on_bus
+  FOR SELECT
+  USING (has_role(auth.uid(), 'admin'::app_role));
 
-### File: `src/hooks/useRouteManager.ts` (lines 131-162)
-
-Replace the batch `.in()` delete for `live_locations` with a loop that deletes per-trip:
-
-```ts
-for (const tripId of tripIds) {
-  const { error: locErr } = await supabase
-    .from("live_locations")
-    .delete()
-    .eq("trip_id", tripId);
-  if (locErr) {
-    toast.error("Failed to remove location history: " + locErr.message);
-    return false;
-  }
-}
+-- Allow admins to delete students_on_bus
+CREATE POLICY "Admins can delete students_on_bus"
+  ON public.students_on_bus
+  FOR DELETE
+  USING (has_role(auth.uid(), 'admin'::app_role));
 ```
 
-Add a new step to delete `students_on_bus` records:
+### Step 2: No code changes needed
 
-```ts
-if (tripIds.length > 0) {
-  await supabase
-    .from("students_on_bus")
-    .delete()
-    .in("trip_id", tripIds);
-}
-```
+The deletion logic in `src/hooks/useRouteManager.ts` is already correct. Once the RLS policies allow the admin to actually delete rows, the existing code will work as intended.
 
-This ensures all dependent records are fully removed before attempting to delete trips, respecting all foreign key constraints regardless of data volume.
+## Why This Fixes It
+
+| Table | Current RLS DELETE | After Fix |
+|-------|-------------------|-----------|
+| `live_locations` | No policy (blocked) | Admins can delete |
+| `students_on_bus` | No policy (blocked) | Admins can delete |
+| `trips` | Admin ALL policy (allowed) | No change needed |
+| `routes` | Admin DELETE policy (allowed) | No change needed |
+
+## Files Changed
+
+| Change | Type |
+|--------|------|
+| New migration: add admin DELETE policies on `live_locations` and `students_on_bus` | Database |
+
+No application code changes required.
