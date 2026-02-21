@@ -177,55 +177,48 @@ const DriverPage = () => {
     const combinedNotes = [option?.delayLabel, notes].filter(Boolean).join(" — ");
 
     try {
-      // Insert exception
+      // Resolve route_id and attempt notification BEFORE inserting
+      const { data: tripData } = await supabase
+        .from("trips")
+        .select("route_id")
+        .eq("id", activeTripId)
+        .single();
+      const routeId = tripData?.route_id;
+
+      let notified = false;
+      if (routeId) {
+        try {
+          await supabase.functions.invoke("send-push-notifications", {
+            body: {
+              type: "exception",
+              bus_id: activeTrip.busId,
+              bus_name: activeTrip.busName,
+              exception_type: isCancellation ? "cancellation" : "time_shift",
+              time_offset_mins: null,
+              route_id: routeId,
+              notes: combinedNotes,
+            },
+          });
+          notified = true;
+        } catch (pushErr) {
+          console.error("Push notification failed:", pushErr);
+        }
+      }
+
+      // Insert exception with correct notified value
       const payload = {
         bus_id: activeTrip.busId,
         exception_date: new Date().toISOString().split("T")[0],
         type: isCancellation ? "cancellation" : "time_shift",
         notes: combinedNotes,
-        notified: false,
+        notified,
         created_by: user.id,
       };
       console.log("Exception payload:", payload);
-      const { data: inserted, error: excError } = await supabase
+      const { error: excError } = await supabase
         .from("exceptions")
-        .insert(payload)
-        .select("id")
-        .single();
+        .insert(payload);
       if (excError) throw excError;
-
-      // Immediately notify students via push notifications
-      if (inserted) {
-        // Find route_id from the active trip
-        const { data: tripData } = await supabase
-          .from("trips")
-          .select("route_id")
-          .eq("id", activeTripId)
-          .single();
-        const routeId = tripData?.route_id;
-
-        if (routeId) {
-          try {
-            await supabase.functions.invoke("send-push-notifications", {
-              body: {
-                type: "exception",
-                bus_id: activeTrip.busId,
-                bus_name: activeTrip.busName,
-                exception_type: isCancellation ? "cancellation" : "time_shift",
-                time_offset_mins: null,
-                route_id: routeId,
-                notes: combinedNotes,
-              },
-            });
-            await supabase
-              .from("exceptions")
-              .update({ notified: true })
-              .eq("id", inserted.id);
-          } catch (pushErr) {
-            console.error("Push notification failed:", pushErr);
-          }
-        }
-      }
 
       if (isCancellation) {
         // Cancel trip
