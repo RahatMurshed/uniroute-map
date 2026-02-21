@@ -247,7 +247,9 @@ const MapPage = () => {
               </div>
 
               {etas.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">This stop is not served today</p>
+                <p className="text-sm text-muted-foreground italic">
+                  {buses.length === 0 ? "No buses currently active" : "No active buses heading to this stop"}
+                </p>
               ) : (
                 <div className="space-y-2 mt-1">
                   {etas.map((eta) => (

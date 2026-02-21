@@ -99,13 +99,16 @@ export function calculateETAsForStop(
   const routeMap = new Map(routes.map((r) => [r.id, r]));
 
   // Find routes that serve this stop
+  // If route has stopSequence, check if stop is in it; if null, treat as serving all stops
   const servingRoutes = routes.filter(
-    (r) => r.stopSequence && r.stopSequence.includes(stop.id),
+    (r) => !r.stopSequence || r.stopSequence.includes(stop.id),
   );
   const servingRouteIds = new Set(servingRoutes.map((r) => r.id));
 
   // Filter buses on those routes
   const relevantBuses = buses.filter((b) => servingRouteIds.has(b.routeId));
+
+  console.log("[ETA] Stop:", stop.id, stop.name, "| Serving routes:", servingRoutes.map(r => r.name), "| Buses:", relevantBuses.length);
 
   if (relevantBuses.length === 0) return [];
 
