@@ -177,7 +177,24 @@ const DriverPage = () => {
     const combinedNotes = [option?.delayLabel, notes].filter(Boolean).join(" — ");
 
     try {
-      // Resolve route_id and attempt notification BEFORE inserting
+      // Insert exception first
+      const payload = {
+        bus_id: activeTrip.busId,
+        exception_date: new Date().toISOString().split("T")[0],
+        type: isCancellation ? "cancellation" : "time_shift",
+        notes: combinedNotes,
+        notified: false,
+        created_by: user.id,
+      };
+      console.log("Exception payload:", payload);
+      const { data: inserted, error: excError } = await supabase
+        .from("exceptions")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (excError) throw excError;
+
+      // Send push notification, then update notified flag
       const { data: tripData } = await supabase
         .from("trips")
         .select("route_id")
@@ -185,10 +202,9 @@ const DriverPage = () => {
         .single();
       const routeId = tripData?.route_id;
 
-      let notified = false;
-      if (routeId) {
+      if (routeId && inserted) {
         try {
-          await supabase.functions.invoke("send-push-notifications", {
+          const { error: pushError } = await supabase.functions.invoke("send-push-notifications", {
             body: {
               type: "exception",
               bus_id: activeTrip.busId,
@@ -199,26 +215,16 @@ const DriverPage = () => {
               notes: combinedNotes,
             },
           });
-          notified = true;
+          if (!pushError) {
+            await supabase
+              .from("exceptions")
+              .update({ notified: true })
+              .eq("id", inserted.id);
+          }
         } catch (pushErr) {
           console.error("Push notification failed:", pushErr);
         }
       }
-
-      // Insert exception with correct notified value
-      const payload = {
-        bus_id: activeTrip.busId,
-        exception_date: new Date().toISOString().split("T")[0],
-        type: isCancellation ? "cancellation" : "time_shift",
-        notes: combinedNotes,
-        notified,
-        created_by: user.id,
-      };
-      console.log("Exception payload:", payload);
-      const { error: excError } = await supabase
-        .from("exceptions")
-        .insert(payload);
-      if (excError) throw excError;
 
       if (isCancellation) {
         // Cancel trip
