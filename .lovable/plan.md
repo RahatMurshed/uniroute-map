@@ -1,48 +1,33 @@
 
 
-# Fix: "This stop is not served today" showing incorrectly
+# Fix: Notification Bell Button Not Visible
 
-## Root Cause
+## Problem
 
-The `calculateETAsForStop()` function in `src/lib/eta.ts` returns an empty array (triggering "This stop is not served today") when either:
+The bell button is wrapped in `{push.supported && (...)}` (line 351 of MapPage.tsx). The `usePushNotifications` hook sets `supported` to `true` only when all three browser APIs exist: `serviceWorker`, `PushManager`, and `Notification`. In the Lovable preview iframe (and some browsers like iOS Safari), these APIs are unavailable, so the bell is permanently hidden.
 
-1. **Route stop_sequence matching fails** -- the route's `stopSequence` is `null` (no sequence configured), so `includes()` never matches.
-2. **No buses in the array** -- even if routes match, if the `buses` array is empty at that moment, it returns `[]`.
+## Solution
 
-The fix needs to be more resilient: if a bus is actively running on a route, show its ETA to any stop, even if stop_sequence is missing or doesn't list every stop.
+Always show the bell button regardless of browser support. When push is not supported, tapping the bell should display a helpful message instead of hiding it entirely.
 
-## Changes
+### Changes
 
-### 1. `src/lib/eta.ts` -- Make route-to-stop matching resilient
+**1. `src/pages/MapPage.tsx` (line 351)**
 
-Update `calculateETAsForStop()`:
-- If a route has a `stopSequence` that includes the stop, match as today.
-- If a route has NO `stopSequence` (null), fall back to showing ETA for all active buses (distance-based) rather than hiding them.
-- Add `console.log` for debugging: log serving routes, relevant buses, and final ETAs.
+Remove the `push.supported &&` conditional so the bell always renders. Update the click handler to show an alert when push is not supported:
 
-### 2. `src/pages/MapPage.tsx` -- Better empty-state messages
+- If not supported: show a toast/alert saying "Push notifications are not supported in this browser. Please use Chrome or Firefox on Android/desktop."
+- If supported but denied: show the denied state (current behavior)
+- If supported and subscribed: prompt to unsubscribe (current behavior)
+- If supported and not subscribed: open the notification sheet (current behavior)
 
-Change the `etas.length === 0` message from a single "not served today" to a contextual message:
-- If `buses.length === 0`: "No buses currently active"
-- Otherwise: "No active buses heading to this stop"
+**2. `src/hooks/usePushNotifications.ts`**
 
-This avoids the misleading "not served today" when buses exist but just don't serve that specific stop.
+No changes needed -- the `supported` flag is still useful for the click handler logic, just not for hiding the button.
 
-### 3. `src/pages/MapPage.tsx` -- Add debug log on stop tap
+### Visual States (unchanged)
 
-Log the selected stop, available buses, and routes to console when a stop is tapped, making future debugging easier.
-
----
-
-## Technical Details
-
-**In `calculateETAsForStop` (eta.ts lines 93-143):**
-- Change route filtering logic:
-  - Current: `routes.filter(r => r.stopSequence && r.stopSequence.includes(stop.id))`
-  - New: `routes.filter(r => !r.stopSequence || r.stopSequence.includes(stop.id))`
-  - This treats routes with no stop_sequence as "serving all stops" (fallback)
-- Add console.log before return for debugging
-
-**In MapPage.tsx (line 250):**
-- Replace `"This stop is not served today"` with conditional check on `buses.length`
+- Grey bell: not subscribed (or not supported)
+- Orange bell: subscribed
+- Bell with slash: permission denied
 
