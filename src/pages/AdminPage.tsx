@@ -1,7 +1,50 @@
-const AdminPage = () => (
-  <div className="flex min-h-screen items-center justify-center bg-background">
-    <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+import { useState } from "react";
+import AdminLayout, { type AdminView } from "@/components/admin/AdminLayout";
+import FleetOverview from "@/components/admin/FleetOverview";
+import { useAdminData } from "@/hooks/useAdminData";
+
+const PlaceholderView = ({ title }: { title: string }) => (
+  <div className="flex items-center justify-center h-64 rounded-xl border border-border bg-muted/30">
+    <p className="text-lg text-muted-foreground">🚧 {title} — Coming Soon</p>
   </div>
 );
+
+const AdminPage = () => {
+  const [activeView, setActiveView] = useState<AdminView>("fleet");
+  const { buses, exceptions, stats, loading, refreshAll } = useAdminData();
+
+  const renderView = () => {
+    switch (activeView) {
+      case "fleet":
+        return (
+          <FleetOverview
+            buses={buses}
+            exceptions={exceptions}
+            stats={stats}
+            loading={loading}
+            onRefresh={refreshAll}
+          />
+        );
+      case "routes":
+        return <PlaceholderView title="Route Manager" />;
+      case "overrides":
+        return <PlaceholderView title="Overrides" />;
+      case "drivers":
+        return <PlaceholderView title="Drivers" />;
+      case "reports":
+        return <PlaceholderView title="Reports" />;
+      case "export":
+        return <PlaceholderView title="PDF Export" />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <AdminLayout activeView={activeView} onViewChange={setActiveView}>
+      {renderView()}
+    </AdminLayout>
+  );
+};
 
 export default AdminPage;
