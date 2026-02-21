@@ -118,7 +118,7 @@ export default function OverrideCard({ override, onEdit, onDelete, onNotify }: P
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {!override.notified && (
+          {!override.notified && !override.isDriverCreated && (
             <Button
               size="sm"
               variant="outline"
