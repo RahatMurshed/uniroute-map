@@ -1,86 +1,58 @@
 
+# Fix: Delete Route Still Failing on Foreign Key Constraint
 
-# Fix Route Manager Delete and Map ETA Labels
+## Root Cause
 
-## FIX 1 -- Cannot Delete Route (Foreign Key Error)
+The `live_locations` delete uses Supabase's `.in('trip_id', tripIds)` which has a default row limit of 1000. If a trip has accumulated many GPS pings, the delete may not remove all `live_locations` rows in a single call, leaving behind rows that block the trip deletion.
 
-### Root Cause
-The `trips.route_id` column is `NOT NULL`, so the user's suggested approach of setting `route_id = null` for completed trips will fail with a database constraint error.
+Additionally, the `students_on_bus` table also has a `trip_id` column which could be another foreign key constraint blocker that isn't being handled.
 
-### Solution
+## Solution
+
 Update `deleteRoute` in `src/hooks/useRouteManager.ts` to:
 
-1. Query all trips referencing this route
-2. If any **active or delayed** trips exist, show an error: "Cannot delete this route -- a bus is currently running on it. End the active trip first, then try again." and abort.
-3. If only **completed/cancelled** trips exist, delete those trip records first (since they are historical and the route is being removed), then delete the route.
-4. If no trips reference the route, delete it directly.
+1. Delete `live_locations` in batches or one trip at a time to avoid the 1000-row limit
+2. Also delete `students_on_bus` records for those trips before deleting the trips
+3. Process each trip individually to ensure complete cleanup
 
-```text
-deleteRoute(id)
-  |
-  +-- Query trips where route_id = id
-  |
-  +-- Has active/delayed trips? --> Error toast, abort
-  |
-  +-- Has completed/cancelled trips? --> Delete those trips first
-  |
-  +-- Delete the route
-  |
-  +-- Success toast
+### Updated deletion order:
+
+```
+Step 1: Check for active/delayed trips (unchanged)
+Step 2: Get completed/cancelled trip IDs (unchanged)
+Step 3: For each trip ID, delete live_locations one trip at a time
+Step 4: Delete students_on_bus for those trip IDs
+Step 5: Delete exceptions for linked buses (unchanged)
+Step 6: Delete the trips
+Step 7: Delete the route
 ```
 
-### File: `src/hooks/useRouteManager.ts` (lines 108-117)
+### File: `src/hooks/useRouteManager.ts` (lines 131-162)
 
-Replace the `deleteRoute` function with logic that:
-- Fetches `trips` with `.select('id, status').eq('route_id', id)`
-- Checks for active/delayed trips and blocks deletion
-- Deletes completed/cancelled trips referencing the route
-- Then deletes the route itself
+Replace the batch `.in()` delete for `live_locations` with a loop that deletes per-trip:
 
----
-
-## FIX 2 -- ETA Label for Passed Stops
-
-### Root Cause
-In `src/lib/eta.ts`, the `formatETA` function (line 85) shows "Next bus not yet departed" when `passed` is true. This message is confusing and unhelpful.
-
-### Solution
-Update the `formatETA` function to return contextual messages:
-
-| Condition | New Message |
-|-----------|-------------|
-| `stale` (GPS > 2 min old) | "Bus location unavailable" (unchanged) |
-| `passed` | "Bus has passed this stop" |
-| `etaMinutes < 1` | "Arriving now! (green circle)" |
-| `etaMinutes <= 2` | "Arriving in ~1-2 min (yellow circle)" |
-| `etaMinutes > 60` | "No bus nearby" (unchanged) |
-| otherwise | "Arriving in ~X min (bus icon)" |
-
-### File: `src/lib/eta.ts` (line 85)
-
-Change:
-```
-if (passed) return "Next bus not yet departed";
-```
-To:
-```
-if (passed) return "🚌 Bus has passed this stop";
+```ts
+for (const tripId of tripIds) {
+  const { error: locErr } = await supabase
+    .from("live_locations")
+    .delete()
+    .eq("trip_id", tripId);
+  if (locErr) {
+    toast.error("Failed to remove location history: " + locErr.message);
+    return false;
+  }
+}
 ```
 
----
+Add a new step to delete `students_on_bus` records:
 
-## Star Button on Stop Popup
+```ts
+if (tripIds.length > 0) {
+  await supabase
+    .from("students_on_bus")
+    .delete()
+    .in("trip_id", tripIds);
+}
+```
 
-The star/favourite button already works correctly in the bottom info card for all stops (lines 409-415 in MapPage.tsx). The stop markers are rebuilt whenever `stops` changes (line 251-265), so newly added stops from Route Manager will appear after the next page load. No changes needed here -- the existing implementation handles this correctly.
-
----
-
-## Summary of Changes
-
-| File | Change |
-|------|--------|
-| `src/hooks/useRouteManager.ts` | Rewrite `deleteRoute` to check for linked trips before deleting |
-| `src/lib/eta.ts` | Change "Next bus not yet departed" to "Bus has passed this stop" |
-
-No database migrations needed. No other files require changes.
-
+This ensures all dependent records are fully removed before attempting to delete trips, respecting all foreign key constraints regardless of data volume.
