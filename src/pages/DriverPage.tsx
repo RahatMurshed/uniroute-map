@@ -59,6 +59,7 @@ const DriverPage = () => {
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
   const [resumeTrip, setResumeTrip] = useState<ActiveTrip | null>(null);
   const [loadingResume, setLoadingResume] = useState(true);
+  const [gpsDenied, setGpsDenied] = useState(false);
 
   // Delay state
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -71,8 +72,28 @@ const DriverPage = () => {
   } = useGpsBroadcast({
     busId: activeTrip?.busId || "",
     tripId: activeTripId || "",
-    active: !!activeTripId && !!activeTrip,
+    active: !!activeTripId && !!activeTrip && !gpsDenied,
   });
+
+  // Detect GPS denied from gpsError
+  useEffect(() => {
+    if (gpsError && gpsError.toLowerCase().includes("denied")) {
+      setGpsDenied(true);
+    } else if (!gpsError) {
+      setGpsDenied(false);
+    }
+  }, [gpsError]);
+
+  const handleRetryGps = () => {
+    navigator.geolocation.getCurrentPosition(
+      () => setGpsDenied(false),
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setGpsDenied(true);
+        }
+      }
+    );
+  };
 
   // Fetch profile + buses + routes
   useEffect(() => {
@@ -113,11 +134,9 @@ const DriverPage = () => {
           startedAt: data.started_at ?? data.id,
         };
 
-        // If we already have this trip active in store, just restore it
         if (activeTripId === data.id) {
           setActiveTrip(trip);
         } else {
-          // Show resume banner
           setResumeTrip(trip);
         }
 
@@ -317,6 +336,37 @@ const DriverPage = () => {
 
   const batLabel = batteryLabel(batteryTier);
 
+  // GPS Permission Denied full-screen
+  if (gpsDenied && activeTrip) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="max-w-sm w-full text-center space-y-6">
+          <div className="text-5xl">📍</div>
+          <h2 className="text-xl font-bold text-foreground">Location Required</h2>
+          <p className="text-sm text-muted-foreground">
+            UniRoute needs GPS access to broadcast your bus location to students.
+          </p>
+          <div className="text-left bg-muted/50 rounded-lg p-4 space-y-2 text-sm text-foreground">
+            <p className="font-medium">To enable:</p>
+            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+              <li>Click the 🔒 lock icon in your browser address bar</li>
+              <li>Set Location to "Allow"</li>
+              <li>Refresh this page</li>
+            </ol>
+          </div>
+          <div className="space-y-3">
+            <Button className="w-full" onClick={handleRetryGps}>
+              Try Again
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => window.location.reload()}>
+              Refresh Page
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Offline / Online banner */}
@@ -352,8 +402,8 @@ const DriverPage = () => {
           {getGreeting()}, <span className="font-semibold">{displayName}</span>
         </p>
 
-        {/* GPS Error */}
-        {gpsError && (
+        {/* GPS Error (non-denied) */}
+        {gpsError && !gpsDenied && (
           <div className="rounded-lg border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {gpsError}
           </div>
@@ -395,7 +445,6 @@ const DriverPage = () => {
         )}
 
         {!activeTrip && !resumeTrip ? (
-          /* ========== STATE 1: Before Trip ========== */
           loadingResume ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -454,7 +503,6 @@ const DriverPage = () => {
             </div>
           )
         ) : activeTrip ? (
-          /* ========== STATE 2: Active Trip ========== */
           <div className="space-y-5">
             {/* Active banner */}
             <div className="rounded-lg bg-emerald-600 px-4 py-3 text-center text-white font-semibold text-base">

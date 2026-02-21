@@ -79,8 +79,9 @@ export default function RouteList({ routes, stops, loading, onNewRoute, onEdit, 
       </div>
 
       {routes.length === 0 ? (
-        <Card className="flex items-center justify-center h-48 text-muted-foreground">
-          No routes yet. Create your first route!
+        <Card className="flex flex-col items-center justify-center h-48 text-center">
+          <p className="text-lg text-muted-foreground">🗺️ No routes created yet</p>
+          <p className="text-sm text-muted-foreground mt-1">Click "+ New Route" to create your first route.</p>
         </Card>
       ) : (
         <div className="space-y-3">

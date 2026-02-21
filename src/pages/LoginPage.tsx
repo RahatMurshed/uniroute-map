@@ -8,6 +8,43 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
+function friendlyError(err: any): string {
+  const msg = (err?.message ?? "").toLowerCase();
+  const status = err?.status ?? err?.statusCode;
+
+  // Network/fetch errors
+  if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
+    return "Connection error. Please check your internet and try again.";
+  }
+
+  // Rate limited
+  if (status === 429 || msg.includes("rate") || msg.includes("too many")) {
+    return "Too many failed attempts. Please wait 5 minutes before trying again.";
+  }
+
+  // Invalid credentials — Supabase returns "Invalid login credentials"
+  if (msg.includes("invalid login credentials") || msg.includes("invalid credentials")) {
+    return "Incorrect email or password. Please try again.";
+  }
+
+  // Email not confirmed
+  if (msg.includes("email not confirmed")) {
+    return "Your email address has not been verified. Please check your inbox.";
+  }
+
+  // User not found (some Supabase configs)
+  if (msg.includes("user not found")) {
+    return "No account found with this email address.";
+  }
+
+  // User banned/disabled
+  if (msg.includes("banned") || msg.includes("disabled")) {
+    return "Your account has been deactivated. Please contact your administrator.";
+  }
+
+  return err?.message || "An unexpected error occurred. Please try again.";
+}
+
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,6 +56,12 @@ const LoginPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!navigator.onLine) {
+      setError("Connection error. Please check your internet and try again.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -44,11 +87,7 @@ const LoginPage = () => {
         await supabase.auth.signOut();
       }
     } catch (err: any) {
-      if (err?.message?.toLowerCase().includes("invalid")) {
-        setError("Invalid email or password. Please try again.");
-      } else if (!error) {
-        setError(err.message || "An unexpected error occurred.");
-      }
+      setError(friendlyError(err));
     } finally {
       setSubmitting(false);
     }

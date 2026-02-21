@@ -42,7 +42,14 @@ export default function FleetOverview({ buses, exceptions, stats, loading, onRef
       {/* Fleet Table */}
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-2">🚌 Fleet Status</h3>
-        <FleetStatusTable buses={buses} onViewOnMap={handleViewOnMap} />
+        {buses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-48 rounded-xl border border-border bg-muted/30 text-center">
+            <p className="text-lg text-muted-foreground">🚌 No buses configured yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Go to Route Manager to add routes and buses.</p>
+          </div>
+        ) : (
+          <FleetStatusTable buses={buses} onViewOnMap={handleViewOnMap} />
+        )}
       </div>
 
       {/* Today's Exceptions */}

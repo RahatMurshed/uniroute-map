@@ -52,8 +52,9 @@ export default function TripsTable({ trips, computeGpsPct, onViewDetail }: Props
 
   if (trips.length === 0) {
     return (
-      <div className="flex items-center justify-center h-40 rounded-xl border border-border bg-muted/30">
-        <p className="text-muted-foreground">No trips found for selected period</p>
+      <div className="flex flex-col items-center justify-center h-40 rounded-xl border border-border bg-muted/30 text-center">
+        <p className="text-lg text-muted-foreground">📊 No trips found for the selected period</p>
+        <p className="text-sm text-muted-foreground mt-1">Try selecting a wider date range.</p>
       </div>
     );
   }
