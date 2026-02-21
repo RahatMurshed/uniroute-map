@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UniRoute — Offline</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #F5F2EB;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .container {
+      text-align: center;
+      max-width: 360px;
+    }
+    .icon { font-size: 64px; margin-bottom: 16px; }
+    h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { font-size: 18px; color: #666; margin-bottom: 24px; }
+    .info {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      text-align: left;
+    }
+    .info h2 { font-size: 14px; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .info p { font-size: 14px; color: #555; line-height: 1.5; }
+    .retry-btn {
+      background: #E8440A;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.2s;
+    }
+    .retry-btn:active { opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📡</div>
+    <h1>You're Offline</h1>
+    <p class="subtitle">UniRoute needs an internet connection</p>
+    <div class="info">
+      <h2>What you can do</h2>
+      <p>The live map and real-time tracking require an internet connection. Check your Wi-Fi or mobile data and try again.</p>
+    </div>
+    <div class="info">
+      <h2>While offline</h2>
+      <p>If you're a driver with an active trip, GPS points are being queued locally and will sync when you reconnect.</p>
+    </div>
+    <button class="retry-btn" onclick="window.location.reload()">Retry Connection</button>
+  </div>
+</body>
+</html>
