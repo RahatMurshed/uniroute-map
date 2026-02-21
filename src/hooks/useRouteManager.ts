@@ -106,7 +106,7 @@ export function useRouteManager() {
   };
 
   const deleteRoute = async (id: string) => {
-    // Check for linked trips
+    // Step 1: Check for linked trips
     const { data: linkedTrips, error: fetchErr } = await supabase
       .from("trips")
       .select("id, status")
@@ -119,29 +119,56 @@ export function useRouteManager() {
 
     const activeTrips = (linkedTrips ?? []).filter(t => t.status === "active" || t.status === "delayed");
     if (activeTrips.length > 0) {
-      toast.error("Cannot delete this route — a bus is currently running on it. End the active trip first, then try again.");
+      toast.error("Cannot delete — a bus is currently running on this route.");
       return false;
     }
 
-    // Delete completed/cancelled trips referencing this route
-    const historicalTrips = (linkedTrips ?? []).filter(t => t.status === "completed" || t.status === "cancelled");
-    if (historicalTrips.length > 0) {
+    // Step 2: Get completed/cancelled trip IDs
+    const tripIds = (linkedTrips ?? [])
+      .filter(t => t.status === "completed" || t.status === "cancelled")
+      .map(t => t.id);
+
+    // Step 3: Delete live_locations for those trips
+    if (tripIds.length > 0) {
+      const { error: locErr } = await supabase
+        .from("live_locations")
+        .delete()
+        .in("trip_id", tripIds);
+      if (locErr) {
+        toast.error("Failed to remove location history: " + locErr.message);
+        return false;
+      }
+    }
+
+    // Step 4: Delete exceptions referencing buses that default to this route
+    const { data: linkedBuses } = await supabase
+      .from("buses")
+      .select("id")
+      .eq("default_route_id", id);
+    const busIds = (linkedBuses ?? []).map(b => b.id);
+    if (busIds.length > 0) {
+      await supabase.from("exceptions").delete().in("bus_id", busIds);
+    }
+
+    // Step 5: Delete the trips
+    if (tripIds.length > 0) {
       const { error: delTripsErr } = await supabase
         .from("trips")
         .delete()
-        .eq("route_id", id)
-        .in("status", ["completed", "cancelled"]);
+        .in("id", tripIds);
       if (delTripsErr) {
         toast.error("Failed to remove linked trips: " + delTripsErr.message);
         return false;
       }
     }
 
+    // Step 6: Delete the route
     const { error } = await supabase.from("routes").delete().eq("id", id);
     if (error) {
       toast.error("Failed to delete route: " + error.message);
       return false;
     }
+
     toast.success("✅ Route deleted successfully");
     await fetchRoutes();
     return true;
