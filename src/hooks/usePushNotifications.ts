@@ -36,7 +36,7 @@ export function usePushNotifications() {
 
   // Check current subscription status
   const checkSubscription = useCallback(async () => {
-    const supported = "serviceWorker" in navigator && "PushManager" in navigator && "Notification" in window;
+    const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
     if (!supported) {
       setState({ supported: false, permission: "default", subscribed: false, loading: false, subscribedRouteId: null, subscribedStopId: null });
       return;
