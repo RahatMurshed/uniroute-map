@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { toast } from "@/hooks/use-toast";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useMapData, type BusLocation, type Stop } from "@/hooks/useMapData";
@@ -348,25 +349,30 @@ const MapPage = () => {
               </select>
 
               {/* Notification bell */}
-              {push.supported && (
-                <button
-                  onClick={() => {
-                    if (push.subscribed) {
-                      if (confirm("Turn off notifications for this route?")) {
-                        push.unsubscribe();
-                      }
-                    } else {
-                      setNotifSheetOpen(true);
+              <button
+                onClick={() => {
+                  if (!push.supported) {
+                    toast({
+                      title: "Not supported",
+                      description: "Push notifications are not supported in this browser. Please use Chrome or Firefox on Android/desktop.",
+                    });
+                    return;
+                  }
+                  if (push.subscribed) {
+                    if (confirm("Turn off notifications for this route?")) {
+                      push.unsubscribe();
                     }
-                  }}
-                  className={`rounded-xl backdrop-blur-md shadow-lg border border-border min-w-[44px] min-h-[44px] flex items-center justify-center text-lg ${
-                    push.subscribed ? "bg-orange-500/90" : "bg-background/90"
-                  }`}
-                  aria-label="Notifications"
-                >
-                  {push.permission === "denied" ? "🔕" : "🔔"}
-                </button>
-              )}
+                  } else {
+                    setNotifSheetOpen(true);
+                  }
+                }}
+                className={`rounded-xl backdrop-blur-md shadow-lg border border-border min-w-[44px] min-h-[44px] flex items-center justify-center text-lg ${
+                  push.subscribed ? "bg-orange-500/90" : "bg-background/90"
+                }`}
+                aria-label="Notifications"
+              >
+                {push.permission === "denied" ? "🔕" : "🔔"}
+              </button>
             </div>
           </div>
 
