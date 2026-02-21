@@ -2,6 +2,7 @@ import { useState } from "react";
 import AdminLayout, { type AdminView } from "@/components/admin/AdminLayout";
 import FleetOverview from "@/components/admin/FleetOverview";
 import RouteManager from "@/components/admin/RouteManager";
+import OverridesManager from "@/components/admin/OverridesManager";
 import { useAdminData } from "@/hooks/useAdminData";
 
 const PlaceholderView = ({ title }: { title: string }) => (
@@ -29,7 +30,7 @@ const AdminPage = () => {
       case "routes":
         return <RouteManager />;
       case "overrides":
-        return <PlaceholderView title="Overrides" />;
+        return <OverridesManager />;
       case "drivers":
         return <PlaceholderView title="Drivers" />;
       case "reports":
