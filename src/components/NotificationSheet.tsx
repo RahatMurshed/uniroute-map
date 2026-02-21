@@ -54,11 +54,11 @@ export default function NotificationSheet({
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 z-[2000] bg-black/50 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={onClose}
       />
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-background border-t border-border shadow-lg transition-transform duration-300 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
+        className={`fixed inset-x-0 bottom-0 z-[2001] rounded-t-2xl bg-background border-t border-border shadow-lg transition-transform duration-300 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
       >
         <div className="mx-auto max-w-md px-5 pb-8 pt-4 space-y-4">
           <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
