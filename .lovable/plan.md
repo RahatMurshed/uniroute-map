@@ -1,42 +1,48 @@
 
 
-# Fix: Exceptions Table INSERT Failing for Drivers
+# Fix: "This stop is not served today" showing incorrectly
 
-## Problem
-The delay report form fails because the RLS policies on the `exceptions` table are all **restrictive** (not permissive). In PostgreSQL, when multiple restrictive policies exist, **all** of them must pass. Since a driver is not an admin, the "Admins can insert exceptions" restrictive policy always fails for drivers, blocking their insert -- even though the "Drivers can insert exceptions for their own bus" policy passes.
+## Root Cause
 
-## Solution
+The `calculateETAsForStop()` function in `src/lib/eta.ts` returns an empty array (triggering "This stop is not served today") when either:
 
-### 1. Database Migration: Fix RLS Policies
-Drop the existing restrictive INSERT policies on `exceptions` and recreate them as **permissive** policies. This way, if **any** policy passes (admin OR driver), the insert is allowed.
+1. **Route stop_sequence matching fails** -- the route's `stopSequence` is `null` (no sequence configured), so `includes()` never matches.
+2. **No buses in the array** -- even if routes match, if the `buses` array is empty at that moment, it returns `[]`.
 
-Policies to recreate as permissive:
-- "Admins can insert exceptions" (permissive, `WITH CHECK: has_role(auth.uid(), 'admin')`)
-- "Drivers can insert exceptions for their own bus" (permissive, `WITH CHECK: created_by = auth.uid()`)
+The fix needs to be more resilient: if a bus is actively running on a route, show its ETA to any stop, even if stop_sequence is missing or doesn't list every stop.
 
-### 2. Code Change: Add console.log Before INSERT
-In `src/pages/DriverPage.tsx`, add a `console.log` of the full payload object right before the `supabase.from("exceptions").insert(...)` call in the `handleReportSubmit` function (around line 181). This logs `bus_id`, `exception_date`, `type`, `notes`, `notified`, and `created_by` for debugging verification.
+## Changes
+
+### 1. `src/lib/eta.ts` -- Make route-to-stop matching resilient
+
+Update `calculateETAsForStop()`:
+- If a route has a `stopSequence` that includes the stop, match as today.
+- If a route has NO `stopSequence` (null), fall back to showing ETA for all active buses (distance-based) rather than hiding them.
+- Add `console.log` for debugging: log serving routes, relevant buses, and final ETAs.
+
+### 2. `src/pages/MapPage.tsx` -- Better empty-state messages
+
+Change the `etas.length === 0` message from a single "not served today" to a contextual message:
+- If `buses.length === 0`: "No buses currently active"
+- Otherwise: "No active buses heading to this stop"
+
+This avoids the misleading "not served today" when buses exist but just don't serve that specific stop.
+
+### 3. `src/pages/MapPage.tsx` -- Add debug log on stop tap
+
+Log the selected stop, available buses, and routes to console when a stop is tapped, making future debugging easier.
 
 ---
 
-### Technical Details
+## Technical Details
 
-**Migration SQL:**
-```text
-DROP POLICY "Admins can insert exceptions" ON public.exceptions;
-DROP POLICY "Drivers can insert exceptions for their own bus" ON public.exceptions;
+**In `calculateETAsForStop` (eta.ts lines 93-143):**
+- Change route filtering logic:
+  - Current: `routes.filter(r => r.stopSequence && r.stopSequence.includes(stop.id))`
+  - New: `routes.filter(r => !r.stopSequence || r.stopSequence.includes(stop.id))`
+  - This treats routes with no stop_sequence as "serving all stops" (fallback)
+- Add console.log before return for debugging
 
-CREATE POLICY "Admins can insert exceptions"
-  ON public.exceptions FOR INSERT
-  WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
-
-CREATE POLICY "Drivers can insert exceptions for their own bus"
-  ON public.exceptions FOR INSERT
-  WITH CHECK (created_by = auth.uid());
-```
-
-**Code change in DriverPage.tsx (~line 180):**
-- Build a `payload` object with all fields
-- `console.log("Exception payload:", payload)`
-- Pass `payload` to the `.insert()` call
+**In MapPage.tsx (line 250):**
+- Replace `"This stop is not served today"` with conditional check on `buses.length`
 
