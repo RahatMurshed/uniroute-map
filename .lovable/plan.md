@@ -1,53 +1,85 @@
 
 
-# Fix: Driver delay reports show "Not Yet Notified"
+# Fix: "Not Yet Notified" persists after driver delay report
 
 ## Root Cause
 
-Two issues prevent `notified` from being set to `true`:
+The `.update({ notified: true })` call after sending the notification keeps failing silently despite correct-looking RLS policies. The driver's UPDATE is being blocked at the database level, and the error is swallowed because the result is not checked.
 
-1. The exception is inserted with `notified: false` on line 186
-2. The subsequent `UPDATE exceptions SET notified = true` on lines 220-223 **silently fails** because the RLS policy on the `exceptions` table only allows **admins** to update -- drivers have no UPDATE permission
+## Solution: Notify First, Then Insert Once
 
-## Solution
+Instead of INSERT (notified=false) -> notify -> UPDATE (notified=true), restructure to:
 
-**Change the insert flow so notifications fire first, then insert with the correct `notified` value.** This avoids needing an UPDATE at all.
+1. Resolve route_id from the active trip
+2. Call the `send-push-notifications` Edge Function
+3. INSERT the exception with `notified: true` if the notification succeeded, or `notified: false` if it failed
 
-### File: `src/pages/DriverPage.tsx`
+This eliminates the UPDATE call entirely -- only a single INSERT is needed, which drivers already have RLS permission for.
 
-Restructure `handleReportSubmit` (lines 180-228):
+## File: `src/pages/DriverPage.tsx`
 
-1. Before inserting the exception, resolve `route_id` and attempt the push notification call
-2. If notification succeeds, insert the exception with `notified: true`
-3. If notification fails (or no route found), insert with `notified: false`
-4. Remove the separate UPDATE call entirely (lines 220-223) since it can never succeed under driver RLS
+Replace the current `handleReportSubmit` logic (lines 179-227) with:
 
 ```
-// Pseudocode of new flow:
-const routeId = (await getRouteFromTrip())?.route_id;
-let notified = false;
+try {
+  // 1. Resolve route
+  const { data: tripData } = await supabase
+    .from("trips")
+    .select("route_id")
+    .eq("id", activeTripId)
+    .single();
+  const routeId = tripData?.route_id;
 
-if (routeId) {
-  try {
-    await supabase.functions.invoke("send-push-notifications", { ... });
-    notified = true;
-  } catch { /* log error */ }
+  // 2. Attempt notification BEFORE inserting
+  let notified = false;
+  if (routeId) {
+    try {
+      const { error: pushError } = await supabase.functions.invoke(
+        "send-push-notifications",
+        {
+          body: {
+            type: "exception",
+            bus_id: activeTrip.busId,
+            bus_name: activeTrip.busName,
+            exception_type: isCancellation ? "cancellation" : "time_shift",
+            time_offset_mins: null,
+            route_id: routeId,
+            notes: combinedNotes,
+          },
+        }
+      );
+      if (!pushError) notified = true;
+    } catch (pushErr) {
+      console.error("Push notification failed:", pushErr);
+    }
+  }
+
+  // 3. Single INSERT with correct notified value
+  const { error: excError } = await supabase
+    .from("exceptions")
+    .insert({
+      bus_id: activeTrip.busId,
+      exception_date: new Date().toISOString().split("T")[0],
+      type: isCancellation ? "cancellation" : "time_shift",
+      notes: combinedNotes,
+      notified,          // <-- true if push succeeded
+      created_by: user.id,
+    });
+  if (excError) throw excError;
+
+  // ... rest of flow (cancel trip, toast, etc.)
 }
-
-// Insert with correct notified value
-await supabase.from("exceptions").insert({
-  ...payload,
-  notified,   // true if push succeeded
-});
 ```
 
-### No database/RLS changes needed
+## Why this works
 
-This approach avoids granting drivers UPDATE on exceptions, which would be a broader permission change. By setting the correct value at INSERT time, we work within the existing security model.
+- Drivers have INSERT permission on `exceptions` (RLS policy: "Drivers can insert exceptions for their own bus")
+- No UPDATE call is needed -- the `notified` value is correct from the start
+- The Realtime subscription in `useOverrides.ts` already listens for `event: "*"` (including INSERT), so the admin UI updates automatically
 
-## Result
+## Files changed
 
-- Exception row is created with `notified = true` in the database
-- Admin Overrides page immediately shows "Notified" badge
-- No silent RLS failures
-- No admin action required
+| File | Change |
+|------|--------|
+| `src/pages/DriverPage.tsx` | Restructure: notify first, then single INSERT with correct `notified` value |
+
