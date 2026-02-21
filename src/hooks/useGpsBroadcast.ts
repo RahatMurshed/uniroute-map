@@ -153,6 +153,15 @@ export function useGpsBroadcast({ busId, tripId, active }: UseGpsBroadcastOption
         saveQueue(queue);
       } else {
         setPingCount((c) => c + 1);
+        // Fire-and-forget: trigger proximity push notifications
+        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+        if (projectId) {
+          fetch(`https://${projectId}.supabase.co/functions/v1/send-push-notifications`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "proximity", trip_id: tripId, bus_id: busId, lat: point.lat, lng: point.lng }),
+          }).catch(() => {}); // silent
+        }
       }
     };
 

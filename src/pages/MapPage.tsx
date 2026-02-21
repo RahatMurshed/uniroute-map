@@ -4,6 +4,8 @@ import "leaflet/dist/leaflet.css";
 import { useMapData, type BusLocation, type Stop } from "@/hooks/useMapData";
 import { calculateETAsForStop, recordSpeed, type BusETA } from "@/lib/eta";
 import ScheduleView from "@/components/ScheduleView";
+import NotificationSheet from "@/components/NotificationSheet";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const DEFAULT_CENTER: L.LatLngTuple = [23.8103, 90.4125];
 const DEFAULT_ZOOM = 15;
@@ -100,7 +102,10 @@ const MapPage = () => {
   const [activeTab, setActiveTab] = useState<TabId>(getInitialTab);
   const [favouriteStop, setFavouriteStop] = useState<FavouriteStop | null>(loadFavourite);
   const [showFavBanner, setShowFavBanner] = useState(false);
+  const [notifSheetOpen, setNotifSheetOpen] = useState(false);
   const favInitRef = useRef(false);
+
+  const push = usePushNotifications();
 
   const {
     busLocations,
@@ -341,6 +346,27 @@ const MapPage = () => {
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
+
+              {/* Notification bell */}
+              {push.supported && (
+                <button
+                  onClick={() => {
+                    if (push.subscribed) {
+                      if (confirm("Turn off notifications for this route?")) {
+                        push.unsubscribe();
+                      }
+                    } else {
+                      setNotifSheetOpen(true);
+                    }
+                  }}
+                  className={`rounded-xl backdrop-blur-md shadow-lg border border-border min-w-[44px] min-h-[44px] flex items-center justify-center text-lg ${
+                    push.subscribed ? "bg-orange-500/90" : "bg-background/90"
+                  }`}
+                  aria-label="Notifications"
+                >
+                  {push.permission === "denied" ? "🔕" : "🔔"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -461,6 +487,16 @@ const MapPage = () => {
           </button>
         </div>
       </div>
+
+      {/* Notification subscription sheet */}
+      <NotificationSheet
+        open={notifSheetOpen}
+        onClose={() => setNotifSheetOpen(false)}
+        routes={routes}
+        stops={stops}
+        favouriteStopId={favouriteStop?.stop_id ?? null}
+        onSubscribe={push.subscribe}
+      />
     </div>
   );
 };
