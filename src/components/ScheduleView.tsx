@@ -3,8 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw } from "lucide-react";
-import { haversineDistance } from "@/lib/eta";
+import { haversineDistance, calculateETAsForStop } from "@/lib/eta";
 import type { BusLocation, Stop, RouteInfo } from "@/hooks/useMapData";
+
+interface FavouriteStop {
+  stop_id: string;
+  stop_name: string;
+  landmark: string | null;
+  lat: number;
+  lng: number;
+}
 
 interface Exception {
   id: string;
@@ -40,8 +48,8 @@ function formatActiveDays(days: number[] | null): string {
 }
 
 function isTodayActive(days: number[] | null): boolean {
-  if (!days || days.length === 0) return true; // no config = assume active
-  const jsDay = new Date().getDay(); // 0=Sun
+  if (!days || days.length === 0) return true;
+  const jsDay = new Date().getDay();
   const isoDay = jsDay === 0 ? 7 : jsDay;
   return days.includes(isoDay);
 }
@@ -87,9 +95,12 @@ interface ScheduleViewProps {
   busLocations: Map<string, BusLocation>;
   stops: Stop[];
   routes: RouteInfo[];
+  favouriteStop: FavouriteStop | null;
+  onRemoveFavourite: () => void;
+  onViewFavOnMap: () => void;
 }
 
-export default function ScheduleView({ busLocations, stops, routes }: ScheduleViewProps) {
+export default function ScheduleView({ busLocations, stops, routes, favouriteStop, onRemoveFavourite, onViewFavOnMap }: ScheduleViewProps) {
   const [exceptions, setExceptions] = useState<Exception[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
@@ -98,13 +109,9 @@ export default function ScheduleView({ busLocations, stops, routes }: ScheduleVi
   const buses = useMemo(() => [...busLocations.values()], [busLocations]);
   const stopMap = useMemo(() => new Map(stops.map((s) => [s.id, s])), [stops]);
 
-  // Active trip route IDs
   const activeRouteIds = useMemo(() => new Set(buses.map((b) => b.routeId)), [buses]);
 
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    return d.toISOString().split("T")[0];
-  }, []);
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const todayLabel = useMemo(() => {
     return new Date().toLocaleDateString("en-US", {
@@ -143,17 +150,13 @@ export default function ScheduleView({ busLocations, stops, routes }: ScheduleVi
     setRefreshing(false);
   }, [fetchExceptions]);
 
-  useEffect(() => {
-    fetchExceptions();
-  }, [fetchExceptions]);
+  useEffect(() => { fetchExceptions(); }, [fetchExceptions]);
 
-  // Update "last refreshed" display
   useEffect(() => {
     const iv = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(iv);
   }, []);
 
-  // We need raw stop_sequence with scheduled_time. Let's fetch it.
   const [rawRoutes, setRawRoutes] = useState<Map<string, any[]>>(new Map());
 
   useEffect(() => {
@@ -170,11 +173,18 @@ export default function ScheduleView({ busLocations, stops, routes }: ScheduleVi
     fetchRaw();
   }, []);
 
+  // Favourite stop ETA
+  const favEtas = useMemo(() => {
+    if (!favouriteStop) return [];
+    const match = stops.find((s) => s.id === favouriteStop.stop_id);
+    if (!match) return [];
+    return calculateETAsForStop(match, buses, routes, stops);
+  }, [favouriteStop, stops, buses, routes]);
+
   function getStopScheduleWithTimes(route: RouteInfo): StopScheduleEntry[] {
     const rawSeq = rawRoutes.get(route.id) ?? [];
     const ids = rawSeq.map((x) => x.stop_id);
     if (ids.length === 0) {
-      // Fallback to route.stopSequence
       const fallbackIds = route.stopSequence ?? [];
       if (fallbackIds.length === 0) return [];
       return fallbackIds.map((stopId) => ({
@@ -196,10 +206,7 @@ export default function ScheduleView({ busLocations, stops, routes }: ScheduleVi
         const s = stopMap.get(ids[i]);
         if (!s) continue;
         const d = haversineDistance(bus.lat, bus.lng, s.lat, s.lng);
-        if (d < minDist) {
-          minDist = d;
-          closestStopIdx = i;
-        }
+        if (d < minDist) { minDist = d; closestStopIdx = i; }
       }
     }
 
@@ -295,6 +302,58 @@ export default function ScheduleView({ busLocations, stops, routes }: ScheduleVi
       </div>
 
       <div className="px-4 py-3 space-y-3">
+        {/* Favourite stop card */}
+        {favouriteStop ? (
+          <Card className="border-yellow-400/50 bg-yellow-50/30 dark:bg-yellow-900/10">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl shrink-0">⭐</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground mb-0.5">Your Favourite Stop</p>
+                  <h3 className="font-semibold text-foreground">📍 {favouriteStop.stop_name}</h3>
+                  {favouriteStop.landmark && (
+                    <p className="text-xs text-muted-foreground">{favouriteStop.landmark}</p>
+                  )}
+                  {favEtas.length > 0 ? (
+                    <div className="mt-2 space-y-1">
+                      {favEtas.slice(0, 2).map((eta) => (
+                        <p key={eta.busId} className="text-sm text-foreground">
+                          🚌 {eta.busName} – {eta.routeName}<br />
+                          <span className="text-muted-foreground">{eta.label}</span>
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic mt-1">
+                      {buses.length === 0 ? "No buses currently active" : "No active buses heading here"}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-3 mt-3">
+                    <button
+                      onClick={onViewFavOnMap}
+                      className="text-sm font-medium text-primary hover:underline min-h-[44px] flex items-center"
+                    >
+                      View on Map
+                    </button>
+                    <button
+                      onClick={onRemoveFavourite}
+                      className="text-sm font-medium text-muted-foreground hover:text-destructive min-h-[44px] flex items-center"
+                    >
+                      Remove ☆
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border p-4 text-center">
+            <p className="text-sm text-muted-foreground">
+              Tap ⭐ on any stop to save your favourite
+            </p>
+          </div>
+        )}
+
         {/* Exception banner */}
         {exceptions.length > 0 && (
           <div className="rounded-xl bg-orange-500/10 border border-orange-500/30 p-3">

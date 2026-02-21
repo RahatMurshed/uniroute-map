@@ -8,7 +8,17 @@ import ScheduleView from "@/components/ScheduleView";
 const DEFAULT_CENTER: L.LatLngTuple = [23.8103, 90.4125];
 const DEFAULT_ZOOM = 15;
 
+const FAV_STORAGE_KEY = "uniroute_favourite_stop";
+
 type TabId = "map" | "schedule";
+
+interface FavouriteStop {
+  stop_id: string;
+  stop_name: string;
+  landmark: string | null;
+  lat: number;
+  lng: number;
+}
 
 function getInitialTab(): TabId {
   try {
@@ -16,6 +26,31 @@ function getInitialTab(): TabId {
     if (saved === "schedule") return "schedule";
   } catch {}
   return "map";
+}
+
+function loadFavourite(): FavouriteStop | null {
+  try {
+    const raw = localStorage.getItem(FAV_STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as FavouriteStop;
+  } catch {}
+  return null;
+}
+
+function saveFavourite(stop: Stop) {
+  localStorage.setItem(
+    FAV_STORAGE_KEY,
+    JSON.stringify({
+      stop_id: stop.id,
+      stop_name: stop.name,
+      landmark: stop.landmark,
+      lat: stop.lat,
+      lng: stop.lng,
+    })
+  );
+}
+
+function clearFavourite() {
+  localStorage.removeItem(FAV_STORAGE_KEY);
 }
 
 function timeAgo(ts: string) {
@@ -36,22 +71,36 @@ function makeBusIcon(color: string) {
   });
 }
 
-const stopIcon = L.divIcon({
-  className: "",
-  iconSize: [14, 14],
-  iconAnchor: [7, 7],
-  popupAnchor: [0, -10],
-  html: `<div style="width:14px;height:14px;border-radius:50%;background:#1e293b;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>`,
-});
+function makeStopIcon(isFavourite: boolean) {
+  if (isFavourite) {
+    return L.divIcon({
+      className: "",
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      popupAnchor: [0, -14],
+      html: `<div style="width:24px;height:24px;border-radius:50%;background:hsl(45,93%,47%);border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:12px;">⭐</div>`,
+    });
+  }
+  return L.divIcon({
+    className: "",
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    popupAnchor: [0, -10],
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:#1e293b;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>`,
+  });
+}
 
 const MapPage = () => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const busMarkersRef = useRef<Map<string, L.Marker>>(new Map());
-  const stopMarkersRef = useRef<L.Marker[]>([]);
+  const stopMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   const polylinesRef = useRef<L.Polyline[]>([]);
 
   const [activeTab, setActiveTab] = useState<TabId>(getInitialTab);
+  const [favouriteStop, setFavouriteStop] = useState<FavouriteStop | null>(loadFavourite);
+  const [showFavBanner, setShowFavBanner] = useState(false);
+  const favInitRef = useRef(false);
 
   const {
     busLocations,
@@ -74,14 +123,55 @@ const MapPage = () => {
     try { localStorage.setItem("uniroute-tab", tab); } catch {}
   }, []);
 
-  // Record speeds for rolling average whenever bus locations change
+  // Toggle favourite
+  const toggleFavourite = useCallback((stop: Stop) => {
+    if (favouriteStop?.stop_id === stop.id) {
+      clearFavourite();
+      setFavouriteStop(null);
+    } else {
+      saveFavourite(stop);
+      setFavouriteStop({
+        stop_id: stop.id,
+        stop_name: stop.name,
+        landmark: stop.landmark,
+        lat: stop.lat,
+        lng: stop.lng,
+      });
+    }
+  }, [favouriteStop]);
+
+  const removeFavourite = useCallback(() => {
+    clearFavourite();
+    setFavouriteStop(null);
+  }, []);
+
+  // On load: auto-select favourite stop once stops are loaded
+  useEffect(() => {
+    if (favInitRef.current || !favouriteStop || stops.length === 0) return;
+    const match = stops.find((s) => s.id === favouriteStop.stop_id);
+    if (!match) {
+      // Stop no longer exists
+      clearFavourite();
+      setFavouriteStop(null);
+      return;
+    }
+    favInitRef.current = true;
+    setSelectedStop(match);
+    setShowFavBanner(true);
+    // Pan map
+    if (mapRef.current) {
+      mapRef.current.setView([match.lat, match.lng], 16, { animate: true });
+    }
+  }, [favouriteStop, stops]);
+
+  // Record speeds
   useEffect(() => {
     for (const bus of buses) {
       recordSpeed(bus.busId, bus.speedKmh);
     }
   }, [buses]);
 
-  // Recalculate ETAs when buses update or selected stop changes
+  // Recalculate ETAs
   useEffect(() => {
     if (!selectedStop) {
       setEtas([]);
@@ -91,7 +181,7 @@ const MapPage = () => {
     setEtas(results);
   }, [selectedStop, buses, routes, stops]);
 
-  // Tick counter for "last updated X secs ago"
+  // Tick counter
   useEffect(() => {
     if (!selectedStop || etas.length === 0) return;
     const interval = setInterval(() => setTickCounter((c) => c + 1), 1000);
@@ -143,7 +233,6 @@ const MapPage = () => {
       }
     }
 
-    // Remove stale markers
     for (const [id, marker] of busMarkersRef.current) {
       if (!currentIds.has(id)) {
         marker.remove();
@@ -152,22 +241,22 @@ const MapPage = () => {
     }
   }, [buses]);
 
-  // Update stop markers
+  // Update stop markers — rebuilt when stops or favourite changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     stopMarkersRef.current.forEach((m) => m.remove());
-    stopMarkersRef.current = [];
+    stopMarkersRef.current = new Map();
 
     for (const s of stops) {
-      const marker = L.marker([s.lat, s.lng], { icon: stopIcon })
-        .addTo(map)
-        .bindPopup(`<div style="font-size:13px;"><b>${s.name}</b>${s.landmark ? `<br/><span style="color:#64748b;font-size:11px;">${s.landmark}</span>` : ""}</div>`);
+      const isFav = favouriteStop?.stop_id === s.id;
+      const marker = L.marker([s.lat, s.lng], { icon: makeStopIcon(isFav) })
+        .addTo(map);
       marker.on("click", () => setSelectedStop(s));
-      stopMarkersRef.current.push(marker);
+      stopMarkersRef.current.set(s.id, marker);
     }
-  }, [stops]);
+  }, [stops, favouriteStop?.stop_id]);
 
   // Draw route polylines
   useEffect(() => {
@@ -200,16 +289,30 @@ const MapPage = () => {
   const fittedRef = useRef(false);
   useEffect(() => {
     if (fittedRef.current || buses.length === 0 || !mapRef.current) return;
+    // Don't fit if we already panned to favourite
+    if (favInitRef.current) { fittedRef.current = true; return; }
     const bounds = L.latLngBounds(buses.map((b) => [b.lat, b.lng] as L.LatLngTuple));
     mapRef.current.fitBounds(bounds.pad(0.3), { maxZoom: 16 });
     fittedRef.current = true;
   }, [buses]);
 
+  // Navigate to favourite stop from schedule tab
+  const goToFavOnMap = useCallback(() => {
+    if (!favouriteStop) return;
+    const match = stops.find((s) => s.id === favouriteStop.stop_id);
+    if (!match) return;
+    handleTabChange("map");
+    setSelectedStop(match);
+    setTimeout(() => {
+      mapRef.current?.setView([match.lat, match.lng], 16, { animate: true });
+    }, 100);
+  }, [favouriteStop, stops, handleTabChange]);
+
   return (
     <div className="fixed inset-0 z-0 flex flex-col">
       {/* ── Content area ── */}
       <div className="flex-1 relative overflow-hidden">
-        {/* Map view (always rendered to keep state) */}
+        {/* Map view */}
         <div className={activeTab === "map" ? "h-full w-full" : "hidden"}>
           <div ref={containerRef} className="h-full w-full" />
 
@@ -241,8 +344,21 @@ const MapPage = () => {
             </div>
           </div>
 
+          {/* ── Favourite banner ── */}
+          {showFavBanner && favouriteStop && (
+            <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[1000] rounded-xl bg-accent/95 backdrop-blur-md shadow-lg px-4 py-2.5 flex items-center gap-2 max-w-xs pointer-events-auto">
+              <p className="text-sm text-accent-foreground">
+                📍 Showing your favourite stop: <strong>{favouriteStop.stop_name}</strong>
+              </p>
+              <button
+                onClick={() => setShowFavBanner(false)}
+                className="text-muted-foreground hover:text-foreground ml-1 p-1 min-w-[28px] min-h-[28px] flex items-center justify-center"
+              >✕</button>
+            </div>
+          )}
+
           {/* ── No active buses banner ── */}
-          {buses.length === 0 && (
+          {buses.length === 0 && !showFavBanner && (
             <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[1000] rounded-xl bg-secondary/95 backdrop-blur-md shadow-lg px-5 py-3 text-center max-w-xs">
               <p className="text-sm text-secondary-foreground">
                 No buses currently active.<br />
@@ -257,11 +373,20 @@ const MapPage = () => {
               {selectedStop ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-foreground">📍 {selectedStop.name}</h3>
-                      {selectedStop.landmark && (
-                        <p className="text-xs text-muted-foreground">{selectedStop.landmark}</p>
-                      )}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <button
+                        onClick={() => toggleFavourite(selectedStop)}
+                        className="text-lg min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
+                        aria-label={favouriteStop?.stop_id === selectedStop.id ? "Remove favourite" : "Set as favourite"}
+                      >
+                        {favouriteStop?.stop_id === selectedStop.id ? "⭐" : "☆"}
+                      </button>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-foreground truncate">📍 {selectedStop.name}</h3>
+                        {selectedStop.landmark && (
+                          <p className="text-xs text-muted-foreground">{selectedStop.landmark}</p>
+                        )}
+                      </div>
                     </div>
                     <button onClick={() => { setSelectedStop(null); setTickCounter(0); }} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1">✕</button>
                   </div>
@@ -297,7 +422,14 @@ const MapPage = () => {
         {/* Schedule view */}
         {activeTab === "schedule" && (
           <div className="h-full overflow-y-auto">
-            <ScheduleView busLocations={busLocations} stops={stops} routes={routes} />
+            <ScheduleView
+              busLocations={busLocations}
+              stops={stops}
+              routes={routes}
+              favouriteStop={favouriteStop}
+              onRemoveFavourite={removeFavourite}
+              onViewFavOnMap={goToFavOnMap}
+            />
           </div>
         )}
       </div>
