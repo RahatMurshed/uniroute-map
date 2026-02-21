@@ -8,7 +8,7 @@ export interface RouteForExport {
   name: string;
   colorHex: string | null;
   activeDays: number[] | null;
-  stopSequence: { stop_id: string; depart_time: string }[] | null;
+  stopSequence: { stop_id: string; scheduled_time: string }[] | null;
 }
 
 export interface StopForExport {
@@ -43,6 +43,15 @@ export interface PdfOptions {
   includeGpsStats: boolean;
   universityName: string;
   footerNote: string;
+}
+
+function formatTime12(t: string): string {
+  if (!t) return "—";
+  const [h, m] = t.split(":");
+  const hr = parseInt(h, 10);
+  const ampm = hr >= 12 ? "PM" : "AM";
+  const hr12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
+  return `${hr12}:${m} ${ampm}`;
 }
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -242,7 +251,8 @@ export function usePdfExport() {
             route.stopSequence.forEach((entry: any) => {
               addPageIfNeeded(7);
               const stopName = stops.get(entry.stop_id)?.name ?? "Unknown Stop";
-              const time = entry.depart_time ?? "—";
+              const rawTime = entry.scheduled_time ?? "";
+              const time = rawTime ? formatTime12(rawTime) : "—";
               doc.text(stopName, margin + 2, y + 4);
               doc.text(time, margin + contentW * 0.6, y + 4);
 
