@@ -1,76 +1,86 @@
 
 
-# Fix Admin Fleet Overview — Driver Name and Active Trips Counter
+# Fix Route Manager Delete and Map ETA Labels
 
-## FIX 1: Driver Name Not Showing
+## FIX 1 -- Cannot Delete Route (Foreign Key Error)
 
 ### Root Cause
-The `profiles` table has an RLS policy that only lets users see their own profile:
-```
-Using Expression: (auth.uid() = id)
-```
-
-When the admin queries `trips` joined with `profiles`, the join silently returns `null` for every driver who isn't the admin themselves. This is why `driverName` always shows "—".
+The `trips.route_id` column is `NOT NULL`, so the user's suggested approach of setting `route_id = null` for completed trips will fail with a database constraint error.
 
 ### Solution
-Two changes are needed:
+Update `deleteRoute` in `src/hooks/useRouteManager.ts` to:
 
-**A. Add an RLS policy so admins can read all profiles**
+1. Query all trips referencing this route
+2. If any **active or delayed** trips exist, show an error: "Cannot delete this route -- a bus is currently running on it. End the active trip first, then try again." and abort.
+3. If only **completed/cancelled** trips exist, delete those trip records first (since they are historical and the route is being removed), then delete the route.
+4. If no trips reference the route, delete it directly.
 
-A new database migration will add:
-```sql
-CREATE POLICY "Admins can view all profiles"
-  ON public.profiles FOR SELECT
-  USING (has_role(auth.uid(), 'admin'::app_role));
+```text
+deleteRoute(id)
+  |
+  +-- Query trips where route_id = id
+  |
+  +-- Has active/delayed trips? --> Error toast, abort
+  |
+  +-- Has completed/cancelled trips? --> Delete those trips first
+  |
+  +-- Delete the route
+  |
+  +-- Success toast
 ```
 
-This lets admin users see any profile's `display_name` through the join.
+### File: `src/hooks/useRouteManager.ts` (lines 108-117)
 
-**B. Update the trip mapping in `useAdminData.ts`**
-
-Use an aliased join for clarity and add a fallback that queries profiles separately if the join returns null:
-
-```ts
-.select(`id, bus_id, route_id, status, driver_id, routes(name), driver:profiles!trips_driver_id_fkey(display_name)`)
-```
-
-Then access as `(t.driver as any)?.display_name`. If the join still fails for any reason, do a separate profiles lookup using the collected `driver_id` values as a fallback.
+Replace the `deleteRoute` function with logic that:
+- Fetches `trips` with `.select('id, status').eq('route_id', id)`
+- Checks for active/delayed trips and blocks deletion
+- Deletes completed/cancelled trips referencing the route
+- Then deletes the route itself
 
 ---
 
-## FIX 2: Active Trips Counter Wrong
+## FIX 2 -- ETA Label for Passed Stops
 
 ### Root Cause
-In `fetchStats()`, the "Active Trips" counter only counts `status = 'active'`, but delayed buses are still physically running and should be included.
+In `src/lib/eta.ts`, the `formatETA` function (line 85) shows "Next bus not yet departed" when `passed` is true. This message is confusing and unhelpful.
 
 ### Solution
+Update the `formatETA` function to return contextual messages:
 
-**File: `src/hooks/useAdminData.ts` — `fetchStats` function**
+| Condition | New Message |
+|-----------|-------------|
+| `stale` (GPS > 2 min old) | "Bus location unavailable" (unchanged) |
+| `passed` | "Bus has passed this stop" |
+| `etaMinutes < 1` | "Arriving now! (green circle)" |
+| `etaMinutes <= 2` | "Arriving in ~1-2 min (yellow circle)" |
+| `etaMinutes > 60` | "No bus nearby" (unchanged) |
+| otherwise | "Arriving in ~X min (bus icon)" |
 
-- Change the "Active Trips" query to count trips where status is `active` OR `delayed`:
-  ```ts
-  supabase.from("trips").select("id", { count: "exact", head: true }).in("status", ["active", "delayed"])
-  ```
+### File: `src/lib/eta.ts` (line 85)
 
-- The "Delayed Today" query stays unchanged (only `status = 'delayed'`).
-
-- Also update the students query to include delayed trips:
-  ```ts
-  supabase.from("trips").select("id").in("status", ["active", "delayed"])
-  ```
+Change:
+```
+if (passed) return "Next bus not yet departed";
+```
+To:
+```
+if (passed) return "🚌 Bus has passed this stop";
+```
 
 ---
 
-## Summary of File Changes
+## Star Button on Stop Popup
 
-### Database Migration (new)
-- Add RLS policy: `Admins can view all profiles` on `profiles` table for SELECT
+The star/favourite button already works correctly in the bottom info card for all stops (lines 409-415 in MapPage.tsx). The stop markers are rebuilt whenever `stops` changes (line 251-265), so newly added stops from Route Manager will appear after the next page load. No changes needed here -- the existing implementation handles this correctly.
 
-### `src/hooks/useAdminData.ts`
-- Line 56: Use aliased join `driver:profiles!trips_driver_id_fkey(display_name)`
-- Line 67: Access driver name via `(t.driver as any)?.display_name`
-- Line 98: Keep existing fallback chain
-- Lines 139-146: Change active trips count to include both `active` and `delayed` statuses
-- Line 146: Change student count query to include both `active` and `delayed` trips
+---
 
-No changes needed to `FleetStatusTable.tsx` or `StatsRow.tsx` — they already render correctly from the data they receive.
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `src/hooks/useRouteManager.ts` | Rewrite `deleteRoute` to check for linked trips before deleting |
+| `src/lib/eta.ts` | Change "Next bus not yet departed" to "Bus has passed this stop" |
+
+No database migrations needed. No other files require changes.
+
