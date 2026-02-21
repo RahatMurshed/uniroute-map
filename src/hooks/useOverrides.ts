@@ -218,11 +218,10 @@ export function useOverrides() {
       overrideRouteId: string | null;
     }
   ) => {
-    // Find the override to get data if not provided
     let busId = data?.busId;
     let type = data?.type;
     let timeOffsetMins = data?.timeOffsetMins;
-    let routeId: string | null = null;
+    let routeId: string | null = data?.overrideRouteId ?? null;
     let busName = "";
 
     if (!data) {
@@ -232,15 +231,37 @@ export function useOverrides() {
       type = override.type;
       timeOffsetMins = override.timeOffsetMins;
       busName = override.busName;
-      routeId = override.overrideRouteId ?? override.defaultRouteId;
+      routeId = override.overrideRouteId;
     } else {
       const bus = buses.find((b) => b.id === data.busId);
       busName = bus?.name ?? "Bus";
-      routeId = data.overrideRouteId ?? bus?.defaultRouteId ?? null;
+    }
+
+    // Fallback 1: check most recent trip for this bus
+    if (!routeId && busId) {
+      const { data: tripData } = await supabase
+        .from("trips")
+        .select("route_id")
+        .eq("bus_id", busId)
+        .in("status", ["active", "delayed", "completed"])
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .single();
+      routeId = tripData?.route_id ?? null;
+    }
+
+    // Fallback 2: check bus default route
+    if (!routeId && busId) {
+      const { data: busData } = await supabase
+        .from("buses")
+        .select("default_route_id")
+        .eq("id", busId)
+        .single();
+      routeId = busData?.default_route_id ?? null;
     }
 
     if (!routeId) {
-      toast.error("Cannot notify: no route associated with this bus");
+      toast.error("No route found. Please assign a default route to this bus first.");
       return false;
     }
 
