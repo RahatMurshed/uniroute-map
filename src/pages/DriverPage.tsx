@@ -177,24 +177,7 @@ const DriverPage = () => {
     const combinedNotes = [option?.delayLabel, notes].filter(Boolean).join(" — ");
 
     try {
-      // Insert exception first
-      const payload = {
-        bus_id: activeTrip.busId,
-        exception_date: new Date().toISOString().split("T")[0],
-        type: isCancellation ? "cancellation" : "time_shift",
-        notes: combinedNotes,
-        notified: false,
-        created_by: user.id,
-      };
-      console.log("Exception payload:", payload);
-      const { data: inserted, error: excError } = await supabase
-        .from("exceptions")
-        .insert(payload)
-        .select("id")
-        .single();
-      if (excError) throw excError;
-
-      // Send push notification, then update notified flag
+      // 1. Resolve route
       const { data: tripData } = await supabase
         .from("trips")
         .select("route_id")
@@ -202,7 +185,9 @@ const DriverPage = () => {
         .single();
       const routeId = tripData?.route_id;
 
-      if (routeId && inserted) {
+      // 2. Attempt notification BEFORE inserting
+      let notified = false;
+      if (routeId) {
         try {
           const { error: pushError } = await supabase.functions.invoke("send-push-notifications", {
             body: {
@@ -215,16 +200,24 @@ const DriverPage = () => {
               notes: combinedNotes,
             },
           });
-          if (!pushError) {
-            await supabase
-              .from("exceptions")
-              .update({ notified: true })
-              .eq("id", inserted.id);
-          }
+          if (!pushError) notified = true;
         } catch (pushErr) {
           console.error("Push notification failed:", pushErr);
         }
       }
+
+      // 3. Single INSERT with correct notified value
+      const { error: excError } = await supabase
+        .from("exceptions")
+        .insert({
+          bus_id: activeTrip.busId,
+          exception_date: new Date().toISOString().split("T")[0],
+          type: isCancellation ? "cancellation" : "time_shift",
+          notes: combinedNotes,
+          notified,
+          created_by: user.id,
+        });
+      if (excError) throw excError;
 
       if (isCancellation) {
         // Cancel trip
