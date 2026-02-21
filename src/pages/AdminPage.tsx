@@ -5,13 +5,8 @@ import RouteManager from "@/components/admin/RouteManager";
 import OverridesManager from "@/components/admin/OverridesManager";
 import DriversManager from "@/components/admin/DriversManager";
 import ReportsView from "@/components/admin/ReportsView";
+import PdfExportView from "@/components/admin/PdfExportView";
 import { useAdminData } from "@/hooks/useAdminData";
-
-const PlaceholderView = ({ title }: { title: string }) => (
-  <div className="flex items-center justify-center h-64 rounded-xl border border-border bg-muted/30">
-    <p className="text-lg text-muted-foreground">🚧 {title} — Coming Soon</p>
-  </div>
-);
 
 const AdminPage = () => {
   const [activeView, setActiveView] = useState<AdminView>("fleet");
@@ -38,7 +33,7 @@ const AdminPage = () => {
       case "reports":
         return <ReportsView />;
       case "export":
-        return <PlaceholderView title="PDF Export" />;
+        return <PdfExportView />;
       default:
         return null;
     }
