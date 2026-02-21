@@ -82,7 +82,7 @@ function hasBusPassed(
 /* ── Format ETA label ── */
 function formatETA(minutes: number, stale: boolean, passed: boolean): string {
   if (stale) return "Bus location unavailable";
-  if (passed) return "Next bus not yet departed";
+  if (passed) return "🚌 Bus has passed this stop";
   if (minutes < 1) return "Arriving now 🟢";
   if (minutes <= 2) return "Arriving in ~1-2 min 🟡";
   if (minutes > 60) return "No bus nearby";

@@ -106,12 +106,43 @@ export function useRouteManager() {
   };
 
   const deleteRoute = async (id: string) => {
+    // Check for linked trips
+    const { data: linkedTrips, error: fetchErr } = await supabase
+      .from("trips")
+      .select("id, status")
+      .eq("route_id", id);
+
+    if (fetchErr) {
+      toast.error("Failed to check linked trips: " + fetchErr.message);
+      return false;
+    }
+
+    const activeTrips = (linkedTrips ?? []).filter(t => t.status === "active" || t.status === "delayed");
+    if (activeTrips.length > 0) {
+      toast.error("Cannot delete this route — a bus is currently running on it. End the active trip first, then try again.");
+      return false;
+    }
+
+    // Delete completed/cancelled trips referencing this route
+    const historicalTrips = (linkedTrips ?? []).filter(t => t.status === "completed" || t.status === "cancelled");
+    if (historicalTrips.length > 0) {
+      const { error: delTripsErr } = await supabase
+        .from("trips")
+        .delete()
+        .eq("route_id", id)
+        .in("status", ["completed", "cancelled"]);
+      if (delTripsErr) {
+        toast.error("Failed to remove linked trips: " + delTripsErr.message);
+        return false;
+      }
+    }
+
     const { error } = await supabase.from("routes").delete().eq("id", id);
     if (error) {
       toast.error("Failed to delete route: " + error.message);
       return false;
     }
-    toast.success("Route deleted");
+    toast.success("✅ Route deleted successfully");
     await fetchRoutes();
     return true;
   };
