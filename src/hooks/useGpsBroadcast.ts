@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
 interface GpsPoint {
   bus_id: string;
@@ -11,6 +10,7 @@ interface GpsPoint {
   heading: number;
   accuracy_m: number;
   timestamp: string;
+  queued_at?: string;
 }
 
 interface UseGpsBroadcastOptions {
@@ -20,6 +20,7 @@ interface UseGpsBroadcastOptions {
 }
 
 const QUEUE_KEY = "uniroute_gps_queue";
+const MAX_QUEUE = 100;
 
 function loadQueue(): GpsPoint[] {
   try {
@@ -30,21 +31,44 @@ function loadQueue(): GpsPoint[] {
 }
 
 function saveQueue(q: GpsPoint[]) {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+  // Keep only most recent MAX_QUEUE
+  const trimmed = q.length > MAX_QUEUE ? q.slice(-MAX_QUEUE) : q;
+  localStorage.setItem(QUEUE_KEY, JSON.stringify(trimmed));
+}
+
+export type BatteryTier = "normal" | "reduced" | "minimal" | "charging";
+
+function getTier(level: number, charging: boolean): BatteryTier {
+  if (charging) return "charging";
+  if (level < 0.2) return "minimal";
+  if (level < 0.5) return "reduced";
+  return "normal";
+}
+
+function getIntervalMs(tier: BatteryTier): number {
+  switch (tier) {
+    case "minimal": return 15000;
+    case "reduced": return 10000;
+    default: return 5000;
+  }
 }
 
 export function useGpsBroadcast({ busId, tripId, active }: UseGpsBroadcastOptions) {
   const [pingCount, setPingCount] = useState(0);
   const [gpsError, setGpsError] = useState<string | null>(null);
-  const [lowBattery, setLowBattery] = useState(false);
+  const [batteryTier, setBatteryTier] = useState<BatteryTier>("normal");
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [queueSize, setQueueSize] = useState(loadQueue().length);
+  const [flushProgress, setFlushProgress] = useState<string | null>(null);
   const [reconnectMsg, setReconnectMsg] = useState<string | null>(null);
+  const [queueTrimmed, setQueueTrimmed] = useState(false);
 
   const latestCoords = useRef<GeolocationCoordinates | null>(null);
   const watchId = useRef<number | null>(null);
   const intervalId = useRef<ReturnType<typeof setInterval> | null>(null);
-  const batteryIntervalId = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lowBatteryRef = useRef(false);
-  const { toast } = useToast();
+  const batteryRef = useRef<any>(null);
+  const tierRef = useRef<BatteryTier>("normal");
+  const flushingRef = useRef(false);
 
   const cleanup = useCallback(() => {
     if (watchId.current !== null) {
@@ -55,11 +79,66 @@ export function useGpsBroadcast({ busId, tripId, active }: UseGpsBroadcastOption
       clearInterval(intervalId.current);
       intervalId.current = null;
     }
-    if (batteryIntervalId.current !== null) {
-      clearInterval(batteryIntervalId.current);
-      batteryIntervalId.current = null;
-    }
     latestCoords.current = null;
+  }, []);
+
+  // Online/offline detection
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
+  // Flush queue when coming back online
+  useEffect(() => {
+    if (isOnline && active) {
+      flushQueue();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline, active]);
+
+  const flushQueue = useCallback(async () => {
+    if (flushingRef.current) return;
+    const queue = loadQueue();
+    if (queue.length === 0) return;
+
+    flushingRef.current = true;
+    const total = queue.length;
+    let sent = 0;
+
+    for (let i = 0; i < queue.length; i++) {
+      setFlushProgress(`Sending ${i + 1} of ${total}…`);
+      const { error } = await supabase.from("live_locations").insert(queue[i]);
+      if (error) {
+        // Stop on first failure, keep remaining
+        const remaining = queue.slice(i);
+        saveQueue(remaining);
+        setQueueSize(remaining.length);
+        setFlushProgress(null);
+        flushingRef.current = false;
+        return;
+      }
+      sent++;
+    }
+
+    saveQueue([]);
+    setQueueSize(0);
+    setFlushProgress(null);
+    setPingCount((c) => c + sent);
+    setReconnectMsg(`✅ Connected — ${sent} queued ping${sent > 1 ? "s" : ""} sent`);
+    setTimeout(() => setReconnectMsg(null), 3000);
+    flushingRef.current = false;
+  }, []);
+
+  // Restart interval when tier changes
+  const restartInterval = useCallback((sendFn: () => void) => {
+    if (intervalId.current !== null) clearInterval(intervalId.current);
+    intervalId.current = setInterval(sendFn, getIntervalMs(tierRef.current));
   }, []);
 
   useEffect(() => {
@@ -71,8 +150,9 @@ export function useGpsBroadcast({ busId, tripId, active }: UseGpsBroadcastOption
     setGpsError(null);
     setPingCount(0);
     setReconnectMsg(null);
+    setQueueTrimmed(false);
 
-    // Start watching position
+    // GPS watch
     if (!navigator.geolocation) {
       setGpsError("GPS is not supported by your browser.");
       return;
@@ -85,9 +165,7 @@ export function useGpsBroadcast({ busId, tripId, active }: UseGpsBroadcastOption
       },
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
-          setGpsError(
-            "GPS access denied. Please enable location permissions in your browser settings to use the driver app."
-          );
+          setGpsError("GPS access denied. Please enable location permissions in your browser settings.");
         } else {
           setGpsError(`GPS error: ${err.message}`);
         }
@@ -95,34 +173,27 @@ export function useGpsBroadcast({ busId, tripId, active }: UseGpsBroadcastOption
       { enableHighAccuracy: true, maximumAge: 3000 }
     );
 
-    // Battery monitoring
-    const checkBattery = async () => {
+    // Battery monitoring with event listeners
+    const setupBattery = async () => {
       try {
         const nav = navigator as any;
-        if (nav.getBattery) {
-          const battery = await nav.getBattery();
-          const isLow = battery.level < 0.2;
-          lowBatteryRef.current = isLow;
-          setLowBattery(isLow);
-        }
-      } catch {
-        // not supported
-      }
-    };
-    checkBattery();
-    batteryIntervalId.current = setInterval(checkBattery, 30000);
+        if (!nav.getBattery) return;
+        const battery = await nav.getBattery();
+        batteryRef.current = battery;
 
-    // Flush queue helper
-    const flushQueue = async () => {
-      const queue = loadQueue();
-      if (queue.length === 0) return;
-      const { error } = await supabase.from("live_locations").insert(queue);
-      if (!error) {
-        const count = queue.length;
-        saveQueue([]);
-        setReconnectMsg(`📡 Reconnected — ${count} queued ping${count > 1 ? "s" : ""} sent`);
-        setPingCount((c) => c + count);
-        setTimeout(() => setReconnectMsg(null), 4000);
+        const update = () => {
+          const newTier = getTier(battery.level, battery.charging);
+          tierRef.current = newTier;
+          setBatteryTier(newTier);
+          // Restart interval with new timing
+          restartInterval(sendPing);
+        };
+
+        update();
+        battery.addEventListener("levelchange", update);
+        battery.addEventListener("chargingchange", update);
+      } catch {
+        // Battery API not supported
       }
     };
 
@@ -142,53 +213,66 @@ export function useGpsBroadcast({ busId, tripId, active }: UseGpsBroadcastOption
         timestamp: new Date().toISOString(),
       };
 
+      if (!navigator.onLine) {
+        // Queue it
+        const queue = loadQueue();
+        queue.push({ ...point, queued_at: new Date().toISOString() });
+        if (queue.length > MAX_QUEUE) {
+          setQueueTrimmed(true);
+        }
+        saveQueue(queue);
+        setQueueSize(Math.min(queue.length, MAX_QUEUE));
+        return;
+      }
+
       // Try flush first
       await flushQueue();
 
       const { error } = await supabase.from("live_locations").insert(point);
       if (error) {
-        // Queue it
         const queue = loadQueue();
-        queue.push(point);
+        queue.push({ ...point, queued_at: new Date().toISOString() });
         saveQueue(queue);
+        setQueueSize(Math.min(queue.length, MAX_QUEUE));
       } else {
         setPingCount((c) => c + 1);
-        // Fire-and-forget: trigger proximity push notifications
+        // Fire-and-forget push notification
         const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
         if (projectId) {
           fetch(`https://${projectId}.supabase.co/functions/v1/send-push-notifications`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ type: "proximity", trip_id: tripId, bus_id: busId, lat: point.lat, lng: point.lng }),
-          }).catch(() => {}); // silent
+          }).catch(() => {});
         }
       }
     };
 
-    // Dynamic interval based on battery
-    const startInterval = () => {
-      if (intervalId.current !== null) clearInterval(intervalId.current);
-      const ms = lowBatteryRef.current ? 15000 : 5000;
-      intervalId.current = setInterval(sendPing, ms);
-    };
-
-    startInterval();
-
-    // Re-check interval when battery state changes
-    const batteryCheck = setInterval(() => {
-      const currentMs = lowBatteryRef.current ? 15000 : 5000;
-      // We just restart the interval periodically to adapt
-      if (intervalId.current !== null) {
-        clearInterval(intervalId.current);
-      }
-      intervalId.current = setInterval(sendPing, currentMs);
-    }, 30000);
+    setupBattery();
+    // Start interval
+    intervalId.current = setInterval(sendPing, getIntervalMs(tierRef.current));
 
     return () => {
       cleanup();
-      clearInterval(batteryCheck);
+      if (batteryRef.current) {
+        try {
+          batteryRef.current.removeEventListener("levelchange", () => {});
+          batteryRef.current.removeEventListener("chargingchange", () => {});
+        } catch {}
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, busId, tripId, cleanup]);
 
-  return { pingCount, gpsError, lowBattery, reconnectMsg, cleanup };
+  return {
+    pingCount,
+    gpsError,
+    batteryTier,
+    isOnline,
+    queueSize,
+    flushProgress,
+    reconnectMsg,
+    queueTrimmed,
+    cleanup,
+  };
 }

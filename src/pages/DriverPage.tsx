@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useGpsBroadcast } from "@/hooks/useGpsBroadcast";
+import { useGpsBroadcast, type BatteryTier } from "@/hooks/useGpsBroadcast";
 import { ReportDelaySheet, ISSUE_OPTIONS, type IssueKey } from "@/components/ReportDelaySheet";
 
 interface BusOption {
@@ -35,6 +35,15 @@ const getGreeting = () => {
   return "Good evening";
 };
 
+const batteryLabel = (tier: BatteryTier): string | null => {
+  switch (tier) {
+    case "reduced": return "🔋 Reduced GPS (battery saving)";
+    case "minimal": return "🔋 Minimal GPS (low battery ⚠️)";
+    case "charging": return "⚡ Charging — Full GPS active";
+    default: return null;
+  }
+};
+
 const DriverPage = () => {
   const { user, signOut, activeTripId, setActiveTripId } = useAuthStore();
   const navigate = useNavigate();
@@ -48,13 +57,18 @@ const DriverPage = () => {
   const [starting, setStarting] = useState(false);
   const [ending, setEnding] = useState(false);
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
+  const [resumeTrip, setResumeTrip] = useState<ActiveTrip | null>(null);
+  const [loadingResume, setLoadingResume] = useState(true);
 
   // Delay state
   const [sheetOpen, setSheetOpen] = useState(false);
   const [delayReason, setDelayReason] = useState<string | null>(null);
 
   // GPS broadcasting
-  const { pingCount, gpsError, lowBattery, reconnectMsg, cleanup: cleanupGps } = useGpsBroadcast({
+  const {
+    pingCount, gpsError, batteryTier, isOnline,
+    queueSize, flushProgress, reconnectMsg, queueTrimmed, cleanup: cleanupGps,
+  } = useGpsBroadcast({
     busId: activeTrip?.busId || "",
     tripId: activeTripId || "",
     active: !!activeTripId && !!activeTrip,
@@ -76,28 +90,38 @@ const DriverPage = () => {
     load();
   }, [user]);
 
-  // Check for existing active trip on mount (also restore delay state)
+  // Check for existing active trip on mount (trip resume)
   useEffect(() => {
     if (!user) return;
     const checkActive = async () => {
+      setLoadingResume(true);
       const { data } = await supabase
         .from("trips")
         .select("id, bus_id, route_id, started_at, status, buses(name), routes(name)")
         .eq("driver_id", user.id)
         .in("status", ["active", "delayed"])
+        .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+
       if (data) {
-        setActiveTripId(data.id);
-        setActiveTrip({
+        const trip: ActiveTrip = {
           id: data.id,
           busId: data.bus_id,
           busName: (data.buses as any)?.name ?? "Unknown Bus",
           routeName: (data.routes as any)?.name ?? "Unknown Route",
           startedAt: data.started_at ?? data.id,
-        });
+        };
+
+        // If we already have this trip active in store, just restore it
+        if (activeTripId === data.id) {
+          setActiveTrip(trip);
+        } else {
+          // Show resume banner
+          setResumeTrip(trip);
+        }
+
         if (data.status === "delayed") {
-          // Restore delay banner — fetch the latest exception for context
           const { data: exc } = await supabase
             .from("exceptions")
             .select("notes")
@@ -108,9 +132,37 @@ const DriverPage = () => {
           setDelayReason(exc?.notes ?? "Delay reported");
         }
       }
+      setLoadingResume(false);
     };
     checkActive();
-  }, [user, setActiveTripId]);
+  }, [user, activeTripId, setActiveTripId]);
+
+  const handleResumeTrip = () => {
+    if (!resumeTrip) return;
+    setActiveTripId(resumeTrip.id);
+    setActiveTrip(resumeTrip);
+    setResumeTrip(null);
+  };
+
+  const handleEndResumedTrip = async () => {
+    if (!resumeTrip) return;
+    setEnding(true);
+    try {
+      await supabase
+        .from("trips")
+        .update({ status: "completed", ended_at: new Date().toISOString() })
+        .eq("id", resumeTrip.id);
+      setResumeTrip(null);
+      setActiveTripId(null);
+      setActiveTrip(null);
+      setDelayReason(null);
+      toast({ title: "✅ Trip ended successfully" });
+    } catch (err: any) {
+      toast({ title: "Failed to end trip", description: err.message, variant: "destructive" });
+    } finally {
+      setEnding(false);
+    }
+  };
 
   const handleStartTrip = async () => {
     if (!user || !selectedBus || !selectedRoute) return;
@@ -177,7 +229,6 @@ const DriverPage = () => {
     const combinedNotes = [option?.delayLabel, notes].filter(Boolean).join(" — ");
 
     try {
-      // 1. Resolve route
       const { data: tripData } = await supabase
         .from("trips")
         .select("route_id")
@@ -185,7 +236,6 @@ const DriverPage = () => {
         .single();
       const routeId = tripData?.route_id;
 
-      // 2. Attempt notification BEFORE inserting
       let notified = false;
       if (routeId) {
         try {
@@ -206,7 +256,6 @@ const DriverPage = () => {
         }
       }
 
-      // 3. Single INSERT with correct notified value
       const { error: excError } = await supabase
         .from("exceptions")
         .insert({
@@ -220,7 +269,6 @@ const DriverPage = () => {
       if (excError) throw excError;
 
       if (isCancellation) {
-        // Cancel trip
         cleanupGps();
         await supabase
           .from("trips")
@@ -231,7 +279,6 @@ const DriverPage = () => {
         setDelayReason(null);
         toast({ title: "✅ Trip cancelled and students notified" });
       } else {
-        // Mark as delayed
         await supabase.from("trips").update({ status: "delayed" }).eq("id", activeTripId);
         setDelayReason(option?.delayLabel ?? "Delay reported");
         toast({ title: "✅ Delay reported and students notified" });
@@ -268,8 +315,28 @@ const DriverPage = () => {
     }
   };
 
+  const batLabel = batteryLabel(batteryTier);
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Offline / Online banner */}
+      {activeTrip && !isOnline && (
+        <div className="bg-red-600 text-white text-center text-sm font-medium px-4 py-2">
+          📡 No Connection — GPS points queued locally
+          {queueSize > 0 && <span className="ml-2">⏳ {queueSize} point{queueSize !== 1 ? "s" : ""} queued</span>}
+        </div>
+      )}
+      {flushProgress && (
+        <div className="bg-emerald-600 text-white text-center text-sm font-medium px-4 py-2">
+          {flushProgress}
+        </div>
+      )}
+      {reconnectMsg && !flushProgress && (
+        <div className="bg-emerald-600 text-white text-center text-sm font-medium px-4 py-2">
+          {reconnectMsg}
+        </div>
+      )}
+
       {/* Header */}
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <h1 className="text-lg font-bold text-foreground">UniRoute Driver</h1>
@@ -292,60 +359,101 @@ const DriverPage = () => {
           </div>
         )}
 
-        {!activeTrip ? (
-          /* ========== STATE 1: Before Trip ========== */
-          <div className="space-y-5">
-            <h2 className="text-base font-semibold text-foreground">Start Your Trip</h2>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Select Your Bus</label>
-              <Select value={selectedBus} onValueChange={setSelectedBus}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Choose a bus…" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover z-50">
-                  {buses.length === 0 && (
-                    <SelectItem value="__none" disabled>No buses assigned</SelectItem>
-                  )}
-                  {buses.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}{b.license_plate ? ` — ${b.license_plate}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Select Route</label>
-              <Select value={selectedRoute} onValueChange={setSelectedRoute}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Choose a route…" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover z-50">
-                  {routes.length === 0 && (
-                    <SelectItem value="__none" disabled>No routes available</SelectItem>
-                  )}
-                  {routes.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-lg py-6"
-              disabled={!selectedBus || !selectedRoute || starting}
-              onClick={handleStartTrip}
-            >
-              {starting ? (
-                <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Starting…</>
-              ) : (
-                "START TRIP 🚌"
-              )}
-            </Button>
+        {/* Queue trimmed warning */}
+        {queueTrimmed && (
+          <div className="rounded-lg border border-amber-500 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 font-medium">
+            ⚠️ Extended offline period detected. Some GPS history may be incomplete.
           </div>
-        ) : (
+        )}
+
+        {/* Trip Resume Banner */}
+        {!activeTrip && resumeTrip && (
+          <div className="rounded-lg border border-blue-500 bg-blue-500/10 px-4 py-4 space-y-3">
+            <p className="text-sm font-semibold text-foreground">🔄 You have an active trip in progress</p>
+            <p className="text-sm text-muted-foreground">
+              {resumeTrip.busName} — {resumeTrip.routeName}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Started at {formatTime(resumeTrip.startedAt)}
+            </p>
+            <div className="flex gap-3">
+              <Button
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={handleResumeTrip}
+              >
+                Resume Trip
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                disabled={ending}
+                onClick={handleEndResumedTrip}
+              >
+                {ending ? <Loader2 className="h-4 w-4 animate-spin" /> : "End Trip"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {!activeTrip && !resumeTrip ? (
+          /* ========== STATE 1: Before Trip ========== */
+          loadingResume ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <h2 className="text-base font-semibold text-foreground">Start Your Trip</h2>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Select Your Bus</label>
+                <Select value={selectedBus} onValueChange={setSelectedBus}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Choose a bus…" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {buses.length === 0 && (
+                      <SelectItem value="__none" disabled>No buses assigned</SelectItem>
+                    )}
+                    {buses.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}{b.license_plate ? ` — ${b.license_plate}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Select Route</label>
+                <Select value={selectedRoute} onValueChange={setSelectedRoute}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Choose a route…" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover z-50">
+                    {routes.length === 0 && (
+                      <SelectItem value="__none" disabled>No routes available</SelectItem>
+                    )}
+                    {routes.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-lg py-6"
+                disabled={!selectedBus || !selectedRoute || starting}
+                onClick={handleStartTrip}
+              >
+                {starting ? (
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Starting…</>
+                ) : (
+                  "START TRIP 🚌"
+                )}
+              </Button>
+            </div>
+          )
+        ) : activeTrip ? (
           /* ========== STATE 2: Active Trip ========== */
           <div className="space-y-5">
             {/* Active banner */}
@@ -366,17 +474,10 @@ const DriverPage = () => {
               </div>
             )}
 
-            {/* Low battery warning */}
-            {lowBattery && (
-              <div className="rounded-lg bg-amber-500/15 border border-amber-500 px-4 py-2 text-sm text-amber-600 font-medium">
-                ⚠️ Low battery — reduced GPS accuracy
-              </div>
-            )}
-
-            {/* Reconnect message */}
-            {reconnectMsg && (
-              <div className="rounded-lg bg-emerald-500/15 border border-emerald-500 px-4 py-2 text-sm text-emerald-600 font-medium">
-                {reconnectMsg}
+            {/* Battery tier indicator */}
+            {batLabel && (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500 px-4 py-2 text-sm text-amber-600 font-medium">
+                {batLabel}
               </div>
             )}
 
@@ -397,6 +498,12 @@ const DriverPage = () => {
                 <span className="text-muted-foreground">GPS Pings Sent</span>
                 <span className="font-mono font-medium text-foreground">{pingCount}</span>
               </div>
+              {queueSize > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Queued (offline)</span>
+                  <span className="font-mono font-medium text-amber-600">{queueSize}</span>
+                </div>
+              )}
             </div>
 
             <Button
@@ -418,7 +525,7 @@ const DriverPage = () => {
               {delayReason ? "UPDATE DELAY ⚠️" : "REPORT DELAY ⚠️"}
             </Button>
           </div>
-        )}
+        ) : null}
       </main>
 
       {/* Report Delay Bottom Sheet */}
