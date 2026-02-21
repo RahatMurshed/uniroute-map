@@ -128,19 +128,31 @@ export function useRouteManager() {
       .filter(t => t.status === "completed" || t.status === "cancelled")
       .map(t => t.id);
 
-    // Step 3: Delete live_locations for those trips
-    if (tripIds.length > 0) {
+    // Step 3: Delete live_locations for those trips (one at a time to avoid row limits)
+    for (const tripId of tripIds) {
       const { error: locErr } = await supabase
         .from("live_locations")
         .delete()
-        .in("trip_id", tripIds);
+        .eq("trip_id", tripId);
       if (locErr) {
         toast.error("Failed to remove location history: " + locErr.message);
         return false;
       }
     }
 
-    // Step 4: Delete exceptions referencing buses that default to this route
+    // Step 4: Delete students_on_bus for those trips
+    if (tripIds.length > 0) {
+      const { error: studErr } = await supabase
+        .from("students_on_bus")
+        .delete()
+        .in("trip_id", tripIds);
+      if (studErr) {
+        toast.error("Failed to remove student records: " + studErr.message);
+        return false;
+      }
+    }
+
+    // Step 5: Delete exceptions referencing buses that default to this route
     const { data: linkedBuses } = await supabase
       .from("buses")
       .select("id")
