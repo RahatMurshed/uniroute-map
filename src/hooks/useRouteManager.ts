@@ -174,7 +174,17 @@ export function useRouteManager() {
       }
     }
 
-    // Step 6: Delete the route
+    // Step 6: Delete push_subscriptions referencing this route
+    const { error: pushErr } = await supabase
+      .from("push_subscriptions")
+      .delete()
+      .eq("route_id", id);
+    if (pushErr) {
+      toast.error("Failed to remove push subscriptions: " + pushErr.message);
+      return false;
+    }
+
+    // Step 7: Delete the route
     const { error } = await supabase.from("routes").delete().eq("id", id);
     if (error) {
       toast.error("Failed to delete route: " + error.message);
