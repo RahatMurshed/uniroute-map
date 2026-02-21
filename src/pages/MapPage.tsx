@@ -7,6 +7,7 @@ import { calculateETAsForStop, recordSpeed, type BusETA } from "@/lib/eta";
 import ScheduleView from "@/components/ScheduleView";
 import NotificationSheet from "@/components/NotificationSheet";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import PwaInstallBanner from "@/components/PwaInstallBanner";
 
 const DEFAULT_CENTER: L.LatLngTuple = [23.8103, 90.4125];
 const DEFAULT_ZOOM = 15;
@@ -537,6 +538,9 @@ const MapPage = () => {
         favouriteStopId={favouriteStop?.stop_id ?? null}
         onSubscribe={push.subscribe}
       />
+
+      {/* PWA install banner */}
+      <PwaInstallBanner />
     </div>
   );
 };
