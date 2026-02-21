@@ -53,10 +53,10 @@ export function useAdminData() {
     // Get active/delayed trips
     const { data: trips } = await supabase
       .from("trips")
-      .select("id, bus_id, route_id, status, routes(name)")
+      .select("id, bus_id, route_id, status, driver_id, routes(name), profiles!trips_driver_id_fkey(display_name)")
       .in("status", ["active", "delayed"]);
 
-    const tripByBus = new Map<string, { id: string; routeId: string; routeName: string; status: string }>();
+    const tripByBus = new Map<string, { id: string; routeId: string; routeName: string; status: string; driverName: string | null }>();
     if (trips) {
       for (const t of trips) {
         tripByBus.set(t.bus_id, {
@@ -64,6 +64,7 @@ export function useAdminData() {
           routeId: t.route_id,
           routeName: (t.routes as any)?.name ?? "Unknown",
           status: t.status,
+          driverName: (t.profiles as any)?.display_name ?? null,
         });
       }
     }
@@ -94,7 +95,7 @@ export function useAdminData() {
         name: b.name,
         licensePlate: b.license_plate,
         status: b.status,
-        driverName: (b.profiles as any)?.display_name ?? null,
+        driverName: trip?.driverName ?? (b.profiles as any)?.display_name ?? null,
         routeName: trip?.routeName ?? null,
         routeId: trip?.routeId ?? null,
         tripStatus: trip?.status ?? null,
