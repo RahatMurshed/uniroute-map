@@ -178,14 +178,16 @@ const DriverPage = () => {
 
     try {
       // Insert exception
-      const { error: excError } = await supabase.from("exceptions").insert({
+      const payload = {
         bus_id: activeTrip.busId,
         exception_date: new Date().toISOString().split("T")[0],
         type: isCancellation ? "cancellation" : "time_shift",
         notes: combinedNotes,
         notified: false,
         created_by: user.id,
-      });
+      };
+      console.log("Exception payload:", payload);
+      const { error: excError } = await supabase.from("exceptions").insert(payload);
       if (excError) throw excError;
 
       if (isCancellation) {
