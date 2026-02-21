@@ -1,27 +1,27 @@
 
 
-# Fix: Push Notifications Incorrectly Detected as Unsupported
+# Fix: NotificationSheet Hidden Behind Map
 
 ## Problem
 
-In `src/hooks/usePushNotifications.ts` (line 39), the browser support check uses:
+When clicking the bell button, `setNotifSheetOpen(true)` IS being called, but the NotificationSheet is invisible because it renders behind the Leaflet map layer.
 
-```js
-"PushManager" in navigator
-```
-
-`PushManager` is a global constructor on `window`, **not** a property of `navigator`. This expression always evaluates to `false`, making `supported` permanently `false` even on Chrome and Firefox.
+- The top bar uses `z-[1000]`
+- Leaflet map tiles and overlays use z-indices in the 200-800 range
+- The NotificationSheet backdrop uses `z-40` and the sheet uses `z-50`
+- Result: the sheet opens but is completely hidden behind the map
 
 ## Solution
 
-Change the check to `"PushManager" in window`:
+Update the z-index values in `src/components/NotificationSheet.tsx` to be higher than the map:
 
-**File: `src/hooks/usePushNotifications.ts` (line 39)**
+### File: `src/components/NotificationSheet.tsx`
 
-```diff
-- const supported = "serviceWorker" in navigator && "PushManager" in navigator && "Notification" in window;
-+ const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-```
+**Line ~54 (backdrop):** Change `z-40` to `z-[2000]`
 
-This is the only change needed. Everything else (subscription flow, bell UI, edge functions) is already wired up correctly.
+**Line ~58 (sheet):** Change `z-50` to `z-[2001]`
+
+This ensures both the backdrop overlay and the bottom sheet render above all map layers and the top bar.
+
+No other files need changes.
 
