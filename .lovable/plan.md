@@ -1,91 +1,53 @@
 
 
-# Fix: Driver Delay Notifications Reach Students with Correct Message
+# Fix: Driver delay reports show "Not Yet Notified"
 
-## Problem
+## Root Cause
 
-Two mismatches prevent the correct notification message from being shown:
+Two issues prevent `notified` from being set to `true`:
 
-1. **Type mismatch**: The driver sends `exception_type: "time_shift"` but the edge function only handles `"delay"` -- so it falls through to a generic "has a service change" message instead of the expected "Bus Running Late" message.
-2. **Missing reason**: The driver's notes (e.g., "Road Blockage") are never sent to the edge function, so students see no explanation.
+1. The exception is inserted with `notified: false` on line 186
+2. The subsequent `UPDATE exceptions SET notified = true` on lines 220-223 **silently fails** because the RLS policy on the `exceptions` table only allows **admins** to update -- drivers have no UPDATE permission
 
-The auto-notification flow itself is already wired up correctly from the previous change. These are message formatting fixes only.
+## Solution
 
-## Changes
+**Change the insert flow so notifications fire first, then insert with the correct `notified` value.** This avoids needing an UPDATE at all.
 
-### 1. Edge Function: `supabase/functions/send-push-notifications/index.ts`
+### File: `src/pages/DriverPage.tsx`
 
-- Add `"time_shift"` as an alias for `"delay"` in the message formatting logic
-- Accept an optional `notes` field in the request body
-- Include notes in the notification body when present
+Restructure `handleReportSubmit` (lines 180-228):
 
-Current (line 171):
+1. Before inserting the exception, resolve `route_id` and attempt the push notification call
+2. If notification succeeds, insert the exception with `notified: true`
+3. If notification fails (or no route found), insert with `notified: false`
+4. Remove the separate UPDATE call entirely (lines 220-223) since it can never succeed under driver RLS
+
 ```
-} else if (exception_type === "delay") {
-```
+// Pseudocode of new flow:
+const routeId = (await getRouteFromTrip())?.route_id;
+let notified = false;
 
-Updated:
-```
-} else if (exception_type === "delay" || exception_type === "time_shift") {
-```
-
-Current body message (line 173):
-```
-body = `${bus_name} delayed by ${time_offset_mins ?? "?"} minutes`;
-```
-
-Updated to include notes when available:
-```
-if (notes) {
-  body = `${bus_name} is delayed -- ${notes}`;
-} else if (time_offset_mins) {
-  body = `${bus_name} delayed by ${time_offset_mins} minutes`;
-} else {
-  body = `${bus_name} is running late`;
+if (routeId) {
+  try {
+    await supabase.functions.invoke("send-push-notifications", { ... });
+    notified = true;
+  } catch { /* log error */ }
 }
+
+// Insert with correct notified value
+await supabase.from("exceptions").insert({
+  ...payload,
+  notified,   // true if push succeeded
+});
 ```
 
-This produces: **"⚠️ Bus Running Late" / "Bus A is delayed -- Road Blockage"**
+### No database/RLS changes needed
 
-### 2. Driver Page: `src/pages/DriverPage.tsx`
-
-Pass the driver's notes to the edge function call so students see the reason.
-
-Current (line 209-217):
-```typescript
-body: {
-  type: "exception",
-  bus_id: activeTrip.busId,
-  bus_name: activeTrip.busName,
-  exception_type: isCancellation ? "cancellation" : "time_shift",
-  time_offset_mins: null,
-  route_id: routeId,
-},
-```
-
-Updated -- add `notes` field:
-```typescript
-body: {
-  type: "exception",
-  bus_id: activeTrip.busId,
-  bus_name: activeTrip.busName,
-  exception_type: isCancellation ? "cancellation" : "time_shift",
-  time_offset_mins: null,
-  route_id: routeId,
-  notes: combinedNotes,
-},
-```
+This approach avoids granting drivers UPDATE on exceptions, which would be a broader permission change. By setting the correct value at INSERT time, we work within the existing security model.
 
 ## Result
 
-- Student receives: **"⚠️ Bus Running Late"** / **"Bus A is delayed -- Road Blockage"**
-- Admin override card shows **"Notified"** immediately (already working)
+- Exception row is created with `notified = true` in the database
+- Admin Overrides page immediately shows "Notified" badge
+- No silent RLS failures
 - No admin action required
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `supabase/functions/send-push-notifications/index.ts` | Handle `time_shift` type, include notes in message |
-| `src/pages/DriverPage.tsx` | Pass `notes` (combinedNotes) to edge function |
-
