@@ -100,9 +100,9 @@ export default function OverridesManager() {
               <Skeleton key={i} className="h-28 rounded-lg" />
             ))
           ) : todayOverrides.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
+          <div className="text-center py-12 text-muted-foreground">
               <p className="text-lg">✅ No service changes today</p>
-              <p className="text-sm mt-1">All buses running on schedule</p>
+              <p className="text-sm mt-1">All routes running as scheduled.</p>
             </div>
           ) : (
             todayOverrides.map((o) => (

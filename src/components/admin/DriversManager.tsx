@@ -70,8 +70,8 @@ export default function DriversManager() {
         </div>
       ) : drivers.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          <p className="text-lg">👤 No drivers yet</p>
-          <p className="text-sm mt-1">Click "+ Add Driver" to create a driver account</p>
+          <p className="text-lg">👤 No drivers added yet</p>
+          <p className="text-sm mt-1">Click "+ Add Driver" to create driver accounts.</p>
         </div>
       ) : (
         <div className="space-y-6">

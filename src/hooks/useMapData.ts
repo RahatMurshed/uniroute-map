@@ -36,7 +36,6 @@ function parseStopSequence(raw: unknown): string[] | null {
   if (!raw || !Array.isArray(raw)) return null;
   if (raw.length === 0) return null;
   if (typeof raw[0] === "string") return raw as string[];
-  // Object format: [{stop_id: "...", scheduled_time: "..."}, ...]
   return raw
     .map((item: any) => item?.stop_id as string | undefined)
     .filter(Boolean) as string[];
@@ -48,6 +47,14 @@ export function useMapData() {
   const [routes, setRoutes] = useState<RouteInfo[]>([]);
   const [connected, setConnected] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
+
+  // Signal lost tracking
+  const [staleBuses, setStaleBuses] = useState<Set<string>>(new Set());
+  const [removedBuses, setRemovedBuses] = useState<Map<string, { busName: string; lastSeen: string }>>(new Map());
+
+  // Polling fallback
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<any>(null);
 
   // Cache trip→bus/route mappings
   const tripMapRef = useRef<Map<string, { busId: string; busName: string; routeId: string; routeName: string; routeColor: string }>>(new Map());
@@ -121,7 +128,68 @@ export function useMapData() {
     loadActiveTrips();
   }, [loadActiveTrips]);
 
-  // Realtime subscription
+  // Stale bus detection — check every 10s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const newStale = new Set<string>();
+      const newRemoved = new Map(removedBuses);
+      let changed = false;
+
+      setBusLocations((prev) => {
+        const next = new Map(prev);
+        for (const [busId, bus] of prev) {
+          const ageSec = (now - new Date(bus.timestamp).getTime()) / 1000;
+          if (ageSec > 300) {
+            // 5 min — remove from map
+            next.delete(busId);
+            newRemoved.set(busId, { busName: bus.busName, lastSeen: bus.timestamp });
+            changed = true;
+          } else if (ageSec > 60) {
+            // 60s — mark stale
+            newStale.add(busId);
+          }
+        }
+        if (changed) {
+          setRemovedBuses(newRemoved);
+        }
+        setStaleBuses(newStale);
+        return changed ? next : prev;
+      });
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [removedBuses]);
+
+  // When a bus comes back, remove from removedBuses
+  useEffect(() => {
+    if (removedBuses.size === 0) return;
+    const restored = new Map(removedBuses);
+    let changed = false;
+    for (const [busId] of removedBuses) {
+      if (busLocations.has(busId)) {
+        restored.delete(busId);
+        changed = true;
+      }
+    }
+    if (changed) setRemovedBuses(restored);
+  }, [busLocations, removedBuses]);
+
+  // Start polling fallback
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) return;
+    pollingRef.current = setInterval(() => {
+      loadActiveTrips();
+    }, 10000);
+  }, [loadActiveTrips]);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  // Realtime subscription with disconnect handling
   useEffect(() => {
     const channel = supabase
       .channel("live-map")
@@ -132,7 +200,6 @@ export function useMapData() {
           const row = payload.new as any;
           const tripInfo = tripMapRef.current.get(row.trip_id);
           if (!tripInfo) {
-            // Unknown trip — refresh trip list
             loadActiveTrips();
             return;
           }
@@ -156,13 +223,23 @@ export function useMapData() {
         }
       )
       .subscribe((status) => {
-        setConnected(status === "SUBSCRIBED");
+        if (status === "SUBSCRIBED") {
+          setConnected(true);
+          stopPolling();
+          loadActiveTrips(); // Fetch latest on reconnect
+        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
+          setConnected(false);
+          startPolling();
+        }
       });
+
+    channelRef.current = channel;
 
     return () => {
       supabase.removeChannel(channel);
+      stopPolling();
     };
-  }, [loadActiveTrips]);
+  }, [loadActiveTrips, startPolling, stopPolling]);
 
   // Filter by selected route
   const filteredBuses = selectedRoute
@@ -189,6 +266,8 @@ export function useMapData() {
     connected,
     selectedRoute,
     setSelectedRoute,
+    staleBuses,
+    removedBuses,
   };
 }
 
