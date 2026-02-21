@@ -3,6 +3,7 @@ import AdminLayout, { type AdminView } from "@/components/admin/AdminLayout";
 import FleetOverview from "@/components/admin/FleetOverview";
 import RouteManager from "@/components/admin/RouteManager";
 import OverridesManager from "@/components/admin/OverridesManager";
+import DriversManager from "@/components/admin/DriversManager";
 import { useAdminData } from "@/hooks/useAdminData";
 
 const PlaceholderView = ({ title }: { title: string }) => (
@@ -32,7 +33,7 @@ const AdminPage = () => {
       case "overrides":
         return <OverridesManager />;
       case "drivers":
-        return <PlaceholderView title="Drivers" />;
+        return <DriversManager />;
       case "reports":
         return <PlaceholderView title="Reports" />;
       case "export":
