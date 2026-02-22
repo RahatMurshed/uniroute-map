@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ClipboardList, CheckCircle2, Circle, Bell } from "lucide-react";
 import type { AdminException } from "@/hooks/useAdminData";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,12 +14,12 @@ function exceptionStyle(type: string) {
   }
 }
 
-function exceptionEmoji(type: string) {
+function ExceptionIcon({ type }: { type: string }) {
   switch (type) {
-    case "cancellation": return "🔴";
-    case "time_shift": return "🟡";
-    case "route_change": return "🔵";
-    default: return "ℹ️";
+    case "cancellation": return <Circle className="h-3 w-3 fill-destructive text-destructive" />;
+    case "time_shift": return <Circle className="h-3 w-3 fill-warning text-warning" />;
+    case "route_change": return <Circle className="h-3 w-3 fill-info text-info" />;
+    default: return <Circle className="h-3 w-3 fill-muted-foreground text-muted-foreground" />;
   }
 }
 
@@ -55,12 +56,14 @@ export default function TodaysExceptions({ exceptions }: { exceptions: AdminExce
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-border">
-        <h3 className="text-sm font-bold tracking-tight text-foreground">📋 Today's Service Changes</h3>
+        <h3 className="text-sm font-bold tracking-tight text-foreground flex items-center gap-2">
+          <ClipboardList className="h-4 w-4 text-muted-foreground" /> Today's Service Changes
+        </h3>
       </div>
       <div className="p-4 space-y-2">
         {exceptions.length === 0 ? (
           <div className="text-center py-6">
-            <span className="text-3xl">✅</span>
+            <CheckCircle2 className="h-8 w-8 text-success mx-auto mb-2" />
             <p className="text-sm font-medium text-foreground mt-2">No service changes today</p>
             <p className="text-xs text-muted-foreground mt-0.5">All routes running as scheduled</p>
           </div>
@@ -69,8 +72,8 @@ export default function TodaysExceptions({ exceptions }: { exceptions: AdminExce
             <div key={ex.id} className={`rounded-xl p-3.5 ${exceptionStyle(ex.type)}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-0.5">
-                  <p className="text-sm font-semibold text-foreground">
-                    {exceptionEmoji(ex.type)} {ex.busName} — {formatType(ex.type)}
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <ExceptionIcon type={ex.type} /> {ex.busName} — {formatType(ex.type)}
                   </p>
                   {ex.notes && <p className="text-sm text-muted-foreground">{ex.notes}</p>}
                   <p className="text-xs text-muted-foreground">
@@ -83,9 +86,10 @@ export default function TodaysExceptions({ exceptions }: { exceptions: AdminExce
                   variant={ex.notified ? "outline" : "default"}
                   disabled={notifying === ex.id}
                   onClick={() => handleNotify(ex)}
-                  className="rounded-lg shrink-0"
+                  className="rounded-lg shrink-0 gap-1.5"
                 >
-                  {ex.notified ? "Re-notify 🔔" : "Notify 🔔"}
+                  <Bell className="h-3.5 w-3.5" />
+                  {ex.notified ? "Re-notify" : "Notify"}
                 </Button>
               </div>
             </div>

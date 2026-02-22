@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
+import { Loader2, Bus } from "lucide-react";
 
 function friendlyError(err: any): string {
   const msg = (err?.message ?? "").toLowerCase();
@@ -86,7 +86,7 @@ const LoginPage = () => {
           <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
         </div>
         <div className="relative text-center text-primary-foreground space-y-4 px-8">
-          <div className="text-8xl">🚌</div>
+          <Bus className="h-20 w-20 mx-auto" />
           <h1 className="text-4xl font-extrabold tracking-tight">UniRoute</h1>
           <p className="text-lg text-primary-foreground/80 max-w-xs mx-auto leading-relaxed">
             Real-time university bus tracking for students and staff
@@ -98,7 +98,7 @@ const LoginPage = () => {
       <div className="flex-1 flex flex-col">
         {/* Mobile header */}
         <div className="md:hidden bg-gradient-to-r from-primary to-primary/90 px-6 py-8 text-primary-foreground text-center safe-top">
-          <div className="text-5xl mb-2">🚌</div>
+          <Bus className="h-12 w-12 mx-auto mb-2" />
           <h1 className="text-2xl font-extrabold tracking-tight">UniRoute</h1>
           <p className="text-sm text-primary-foreground/80 mt-1">Staff & Driver Portal</p>
         </div>

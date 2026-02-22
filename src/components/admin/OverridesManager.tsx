@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Calendar, ClipboardList, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,7 +66,7 @@ export default function OverridesManager() {
       <Tabs defaultValue="today">
         <TabsList className="rounded-xl bg-muted p-1">
           <TabsTrigger value="today" className="rounded-lg gap-1.5 font-semibold data-[state=active]:bg-card data-[state=active]:shadow-sm">
-            📅 Today
+            <Calendar className="h-3.5 w-3.5" /> Today
             {todayOverrides.length > 0 && (
               <span className="ml-1 bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full font-bold">
                 {todayOverrides.length}
@@ -74,7 +74,7 @@ export default function OverridesManager() {
             )}
           </TabsTrigger>
           <TabsTrigger value="upcoming" className="rounded-lg gap-1.5 font-semibold data-[state=active]:bg-card data-[state=active]:shadow-sm">
-            📋 Upcoming
+            <ClipboardList className="h-3.5 w-3.5" /> Upcoming
             {upcomingOverrides.length > 0 && (
               <span className="ml-1 bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full font-bold">
                 {upcomingOverrides.length}
@@ -90,7 +90,7 @@ export default function OverridesManager() {
             ))
           ) : todayOverrides.length === 0 ? (
             <div className="text-center py-16 bg-card rounded-xl border border-border shadow-sm">
-              <span className="text-4xl">✅</span>
+              <CheckCircle2 className="h-10 w-10 text-success mx-auto" />
               <p className="text-base font-semibold text-foreground mt-3">No service changes today</p>
               <p className="text-sm text-muted-foreground mt-1">All routes running as scheduled.</p>
             </div>
@@ -108,7 +108,7 @@ export default function OverridesManager() {
             ))
           ) : upcomingOverrides.length === 0 ? (
             <div className="text-center py-16 bg-card rounded-xl border border-border shadow-sm">
-              <span className="text-4xl">📋</span>
+              <ClipboardList className="h-10 w-10 text-muted-foreground/40 mx-auto" />
               <p className="text-base font-semibold text-foreground mt-3">No upcoming overrides</p>
               <p className="text-sm text-muted-foreground mt-1">Schedule changes will appear here</p>
             </div>

@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, User, Route } from "lucide-react";
 import type { DriverSummary, RouteSummary } from "@/hooks/useReportsData";
 
 interface Props {
@@ -15,7 +15,7 @@ export default function PerformanceSummaries({ driverSummaries, routeSummaries }
       <Collapsible>
         <CollapsibleTrigger className="flex items-center gap-2 w-full text-left font-semibold text-foreground py-2 hover:underline">
           <ChevronDown className="h-4 w-4 transition-transform [&[data-state=open]]:rotate-180" />
-          👤 Driver Performance Summary
+          <User className="h-4 w-4 text-muted-foreground" /> Driver Performance Summary
         </CollapsibleTrigger>
         <CollapsibleContent>
           {driverSummaries.length === 0 ? (
@@ -52,7 +52,7 @@ export default function PerformanceSummaries({ driverSummaries, routeSummaries }
       <Collapsible>
         <CollapsibleTrigger className="flex items-center gap-2 w-full text-left font-semibold text-foreground py-2 hover:underline">
           <ChevronDown className="h-4 w-4 transition-transform [&[data-state=open]]:rotate-180" />
-          🛤️ Route Performance Summary
+          <Route className="h-4 w-4 text-muted-foreground" /> Route Performance Summary
         </CollapsibleTrigger>
         <CollapsibleContent>
           {routeSummaries.length === 0 ? (
