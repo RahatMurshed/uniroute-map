@@ -52,22 +52,25 @@ function timeAgo(ts: string) {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-/* ── Bus marker: label-style card with arrow pointer ── */
+/* ── Bus marker: SVG bus icon with label card ── */
 function makeBusIcon(bus: BusLocation, stale: boolean) {
   const bg = stale ? MU_GREY : (bus.routeColor || MU_RED);
-  const opacity = stale ? "0.6" : "1";
+  const opacity = stale ? "0.7" : "1";
   const speedText = stale ? "Offline" : `${Math.round(bus.speedKmh)} km/h`;
   return L.divIcon({
     className: "",
-    iconSize: [84, 52],
-    iconAnchor: [42, 52],
-    popupAnchor: [0, -52],
-    html: `<div class="bus-marker-label" style="opacity:${opacity}">
-      <div class="bus-marker-body" style="background:${bg};">
-        <span class="bus-marker-name">${bus.busName}</span>
-        <span class="bus-marker-speed">${speedText}</span>
+    iconSize: [106, 60],
+    iconAnchor: [53, 60],
+    popupAnchor: [0, -60],
+    html: `<div style="position:relative;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3));opacity:${opacity};">
+      <div style="background:${bg};border-radius:10px;padding:6px 10px 6px 8px;display:flex;align-items:center;gap:6px;min-width:90px;border:2px solid white;box-shadow:0 2px 8px rgba(204,27,27,0.5);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM6 9V6h5v3H6zm7 0V6h5v3h-5z"/></svg>
+        <div style="display:flex;flex-direction:column;line-height:1.2;">
+          <span style="color:white;font-size:11px;font-weight:700;font-family:system-ui;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;">${bus.busName}</span>
+          <span style="color:rgba(255,255,255,0.85);font-size:9px;font-family:system-ui;">${speedText}</span>
+        </div>
       </div>
-      <div class="bus-marker-arrow" style="border-top-color:${bg};"></div>
+      <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid ${bg};margin:0 auto;"></div>
     </div>`,
   });
 }
@@ -80,7 +83,7 @@ function makeStopIcon(isFavourite: boolean) {
       iconSize: [18, 18],
       iconAnchor: [9, 9],
       popupAnchor: [0, -12],
-      html: `<div class="stop-marker" style="width:18px;height:18px;border-radius:50%;background:${MU_RED};border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>`,
+      html: `<div style="width:18px;height:18px;background:${MU_RED};border:2.5px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(204,27,27,0.4);display:flex;align-items:center;justify-content:center;"><svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>`,
     });
   }
   return L.divIcon({
@@ -88,7 +91,7 @@ function makeStopIcon(isFavourite: boolean) {
     iconSize: [14, 14],
     iconAnchor: [7, 7],
     popupAnchor: [0, -10],
-    html: `<div class="stop-marker" style="width:14px;height:14px;border-radius:50%;background:white;border:2.5px solid ${MU_RED};box-shadow:0 2px 4px rgba(0,0,0,.2);"></div>`,
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:white;border:2.5px solid ${MU_RED};box-shadow:0 2px 6px rgba(0,0,0,0.2);"></div>`,
   });
 }
 
