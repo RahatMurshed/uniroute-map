@@ -4,10 +4,10 @@
 
 import type L from "leaflet";
 
-/** CartoDB Voyager — free, no API key needed */
-export const TILE_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+/** OpenStreetMap — free, no API key needed */
+export const TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 export const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 export const DEFAULT_CENTER: L.LatLngTuple = [23.8103, 90.4125];
 export const DEFAULT_ZOOM = 16;
