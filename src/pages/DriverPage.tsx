@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, LogOut, Bus, MapPin, Play, Square, AlertOctagon, Radio, Navigation, Sunrise, Sun, Moon, RefreshCw, AlertTriangle, WifiOff, CheckCircle2, Battery, BatteryLow, Zap, Clock, Calendar, ChevronRight, Timer, Gauge } from "lucide-react";
+import { Loader2, LogOut, Bus, MapPin, Play, Square, AlertOctagon, Radio, Navigation, Sunrise, Sun, Moon, RefreshCw, AlertTriangle, WifiOff, CheckCircle2, Battery, BatteryLow, Zap, Clock, Calendar, ChevronRight, Timer, Gauge, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGpsBroadcast, type BatteryTier } from "@/hooks/useGpsBroadcast";
 import { ReportDelaySheet, ISSUE_OPTIONS, type IssueKey } from "@/components/ReportDelaySheet";
@@ -15,9 +15,9 @@ interface ActiveTrip { id: string; busId: string; busName: string; routeName: st
 
 const getGreeting = () => {
   const h = new Date().getHours();
-  if (h < 12) return { text: "Good morning", Icon: Sunrise };
-  if (h < 17) return { text: "Good afternoon", Icon: Sun };
-  return { text: "Good evening", Icon: Moon };
+  if (h < 12) return "Good morning,";
+  if (h < 17) return "Good afternoon,";
+  return "Good evening,";
 };
 
 const batteryLabel = (tier: BatteryTier): { text: string; color: string; icon: React.ReactNode } | null => {
@@ -304,6 +304,17 @@ const DriverPage = () => {
 
   return (
     <div className="min-h-screen bg-[#0F172A] flex flex-col">
+      {/* LIVE banner for active trip */}
+      {activeTrip && isOnline && (
+        <div className="bg-[#CC1B1B] text-white text-center text-sm py-2 safe-top flex items-center justify-center gap-2 font-medium">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+          </span>
+          LIVE — Broadcasting your location
+        </div>
+      )}
+
       {/* Offline banner */}
       {activeTrip && !isOnline && (
         <div className="bg-red-500/20 border-b border-red-500/30 text-red-300 text-xs text-center py-2 safe-top flex items-center justify-center gap-2">
@@ -320,37 +331,28 @@ const DriverPage = () => {
           <img src="/metropolitan-logo.png" alt="MU" className="h-7 w-7 object-contain brightness-0 invert" />
           <span className="text-base font-bold text-white tracking-tight">MU Transport</span>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Live indicator in header */}
-          {activeTrip && isOnline && (
-            <div className="flex items-center gap-1.5 mr-1">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-              </span>
-              <span className="text-green-400 text-xs font-semibold">LIVE</span>
-            </div>
-          )}
-          <button onClick={handleLogout} className="text-white/50 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors">
-            <LogOut className="h-5 w-5" />
-          </button>
-        </div>
+        <button onClick={handleLogout} className="text-white/50 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors">
+          <LogOut className="h-5 w-5" />
+        </button>
       </header>
 
       <main className="flex-1 flex flex-col">
         {/* ═══ BUS SELECTION SCREEN ═══ */}
         {!activeTrip && !resumeTrip && !loadingResume && (
           <div className="flex-1 flex flex-col">
-            {/* Dark greeting area */}
-            <div className="px-6 pt-6 pb-10 text-center space-y-3">
-              <greeting.Icon className="h-12 w-12 text-white/20 mx-auto" />
-              <p className="text-lg text-white/60">{greeting.text}</p>
-              <h1 className="text-3xl font-bold text-white">{displayName}</h1>
-              <p className="text-sm text-white/40">{dateStr} · {timeStr}</p>
+            {/* Left-aligned greeting */}
+            <div className="px-6 pt-4 pb-8 space-y-1">
+              <p className="text-2xl text-white">{greeting}</p>
+              <p className="text-2xl font-bold text-[#CC1B1B]">{displayName}</p>
+              <p className="text-sm text-gray-400 mt-1">Ready to start your trip?</p>
+              <div className="flex items-center gap-3 text-xs text-gray-500 mt-2">
+                <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {timeStr}</span>
+                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {dateStr}</span>
+              </div>
             </div>
 
             {/* White bottom card */}
-            <div className="flex-1 bg-white rounded-t-3xl px-6 pt-8 pb-8 space-y-6">
+            <div className="flex-1 bg-white rounded-t-3xl px-6 pt-8 pb-8 space-y-6 max-w-[480px] w-full mx-auto sm:mx-0 sm:ml-auto sm:mr-8">
               <h2 className="text-lg font-bold text-gray-900">Start Your Trip</h2>
 
               {gpsError && !gpsDenied && (
@@ -412,21 +414,27 @@ const DriverPage = () => {
                 </div>
               )}
 
-              <Button
-                className={`w-full h-16 rounded-2xl text-lg font-bold shadow-[0_8px_25px_rgba(204,27,27,0.4)] transition-all active:scale-[0.97] bg-[#CC1B1B] hover:bg-[#A81515] text-white ${
-                  selectedBus && selectedRoute && !starting ? "animate-pulse" : ""
+              <button
+                className={`w-full h-16 rounded-2xl text-lg font-bold shadow-[0_8px_25px_rgba(204,27,27,0.4)] transition-all active:scale-[0.98] text-white flex items-center justify-center gap-2 ${
+                  !selectedBus || !selectedRoute || starting
+                    ? "bg-gray-200 text-gray-400 shadow-none cursor-not-allowed"
+                    : "bg-[#CC1B1B] hover:bg-[#A81515]"
                 }`}
                 disabled={!selectedBus || !selectedRoute || starting}
                 onClick={handleStartTrip}
               >
                 {starting ? (
-                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Starting…</>
+                  <><Loader2 className="h-5 w-5 animate-spin" />Starting…</>
                 ) : (
-                  <><Play className="mr-2 h-5 w-5" /> START TRIP</>
+                  <><Play className="h-5 w-5" /> START TRIP</>
                 )}
-              </Button>
+              </button>
+            </div>
 
-              <p className="text-xs text-gray-400 text-center">GPS will activate automatically when trip starts</p>
+            {/* Bottom helper text */}
+            <div className="bg-[#0F172A] px-6 py-4 space-y-1 text-center">
+              <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5"><Navigation className="h-3 w-3" /> GPS activates on trip start</p>
+              <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5"><Users className="h-3 w-3" /> Students see your location live</p>
             </div>
           </div>
         )}
