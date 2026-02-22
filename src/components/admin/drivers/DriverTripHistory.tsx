@@ -1,23 +1,24 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 
 interface TripRow {
   id: string;
   date: string;
   routeName: string;
-  startTime: string;
-  endTime: string;
+  duration: string;
   status: string;
-  gpsPercent: number;
+}
+
+function StatusIcon({ status }: { status: string }) {
+  if (status === "completed")
+    return <CheckCircle className="h-4 w-4 text-green-600" />;
+  if (status === "cancelled")
+    return <XCircle className="h-4 w-4 text-destructive" />;
+  if (status === "delayed")
+    return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+  return <CheckCircle className="h-4 w-4 text-muted-foreground" />;
 }
 
 export default function DriverTripHistory({ driverId }: { driverId: string }) {
@@ -39,30 +40,24 @@ export default function DriverTripHistory({ driverId }: { driverId: string }) {
         return;
       }
 
-      // Check GPS pings per trip
-      const tripIds = tripData.map((t) => t.id);
-      const { data: locData } = await supabase
-        .from("live_locations")
-        .select("trip_id")
-        .in("trip_id", tripIds);
-
-      const gpsMap = new Map<string, boolean>();
-      (locData ?? []).forEach((l) => gpsMap.set(l.trip_id, true));
-
       const rows: TripRow[] = tripData.map((t) => {
         const started = t.started_at ? new Date(t.started_at) : null;
         const ended = t.ended_at ? new Date(t.ended_at) : null;
-        const fmt = (d: Date | null) => d ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--";
-        const statusEmoji = t.status === "completed" ? "✅" : t.status === "active" ? "🟢" : t.status === "delayed" ? "⚠️" : "❌";
+
+        let duration = "--";
+        if (started && ended) {
+          const mins = Math.round((ended.getTime() - started.getTime()) / 60000);
+          duration = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}min`;
+        }
 
         return {
           id: t.id,
-          date: started ? started.toLocaleDateString([], { day: "numeric", month: "short" }) : "--",
+          date: started
+            ? started.toLocaleDateString([], { day: "numeric", month: "short" })
+            : "--",
           routeName: (t.routes as any)?.name ?? "—",
-          startTime: fmt(started),
-          endTime: fmt(ended),
-          status: statusEmoji,
-          gpsPercent: gpsMap.has(t.id) ? 100 : 0,
+          duration,
+          status: t.status,
         };
       });
 
@@ -72,38 +67,41 @@ export default function DriverTripHistory({ driverId }: { driverId: string }) {
     load();
   }, [driverId]);
 
-  if (loading) return <Skeleton className="h-20 rounded" />;
+  if (loading) return <Skeleton className="h-20 rounded-xl" />;
 
   if (trips.length === 0) {
-    return <p className="text-xs text-muted-foreground text-center py-2">No trips yet</p>;
+    return (
+      <p className="text-sm text-muted-foreground text-center py-4">
+        No trips yet
+      </p>
+    );
   }
 
   return (
-    <div className="border rounded-md overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xs py-1 px-2">Date</TableHead>
-            <TableHead className="text-xs py-1 px-2">Route</TableHead>
-            <TableHead className="text-xs py-1 px-2">Start</TableHead>
-            <TableHead className="text-xs py-1 px-2">End</TableHead>
-            <TableHead className="text-xs py-1 px-2">Status</TableHead>
-            <TableHead className="text-xs py-1 px-2">GPS</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {trips.map((t) => (
-            <TableRow key={t.id}>
-              <TableCell className="text-xs py-1 px-2">{t.date}</TableCell>
-              <TableCell className="text-xs py-1 px-2">{t.routeName}</TableCell>
-              <TableCell className="text-xs py-1 px-2">{t.startTime}</TableCell>
-              <TableCell className="text-xs py-1 px-2">{t.endTime}</TableCell>
-              <TableCell className="text-xs py-1 px-2">{t.status}</TableCell>
-              <TableCell className="text-xs py-1 px-2">{t.gpsPercent}%</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="rounded-xl border border-border overflow-hidden">
+      {/* Header */}
+      <div className="grid grid-cols-4 gap-2 px-4 py-2 bg-muted/50 text-[10px] uppercase tracking-wider font-medium text-muted-foreground">
+        <span>Date</span>
+        <span>Route</span>
+        <span>Time</span>
+        <span className="text-right">Status</span>
+      </div>
+      {/* Rows */}
+      {trips.map((t, i) => (
+        <div
+          key={t.id}
+          className={`grid grid-cols-4 gap-2 px-4 py-2.5 text-sm items-center ${
+            i < trips.length - 1 ? "border-b border-border" : ""
+          }`}
+        >
+          <span className="text-foreground font-medium">{t.date}</span>
+          <span className="text-foreground truncate">{t.routeName}</span>
+          <span className="text-muted-foreground">{t.duration}</span>
+          <span className="flex justify-end">
+            <StatusIcon status={t.status} />
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
