@@ -44,36 +44,32 @@ const ReportDelaySheet = ({ open, onClose, onSubmit }: ReportDelaySheetProps) =>
 
   return (
     <>
-      {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={handleClose}
       />
-      {/* Sheet */}
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-background border-t border-border shadow-lg transition-transform duration-300 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
+        className={`fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-card border-t border-border shadow-lg transition-transform duration-300 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
       >
-        <div className="mx-auto max-w-md px-5 pb-8 pt-4 space-y-5">
-          {/* Handle */}
-          <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+        <div className="mx-auto max-w-md px-5 pb-8 pt-4 space-y-5 safe-bottom">
+          <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
 
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Report an Issue</h2>
-            <button onClick={handleClose} className="text-muted-foreground hover:text-foreground">
+            <h2 className="text-lg font-bold tracking-tight text-foreground">Report an Issue</h2>
+            <button onClick={handleClose} className="text-muted-foreground hover:text-foreground p-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Options */}
           <div className="grid grid-cols-2 gap-3">
             {ISSUE_OPTIONS.map((opt) => (
               <button
                 key={opt.key}
                 onClick={() => setSelected(opt.key)}
-                className={`rounded-xl border-2 px-3 py-3 text-sm font-medium text-left transition-colors ${
+                className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold text-left transition-all min-h-[60px] active:scale-[0.97] ${
                   selected === opt.key
-                    ? "border-primary bg-primary/10 text-foreground"
-                    : "border-border bg-background text-foreground hover:border-muted-foreground"
+                    ? "border-primary bg-primary/10 text-foreground shadow-sm"
+                    : "border-border bg-card text-foreground hover:border-muted-foreground"
                 }`}
               >
                 {opt.label}
@@ -81,19 +77,17 @@ const ReportDelaySheet = ({ open, onClose, onSubmit }: ReportDelaySheetProps) =>
             ))}
           </div>
 
-          {/* Notes */}
           <Textarea
             placeholder="Additional notes (optional)"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="resize-none bg-background"
+            className="resize-none bg-background rounded-xl border-border"
             rows={2}
           />
 
-          {/* Actions */}
           <div className="space-y-3">
             <Button
-              className="w-full py-5 text-base"
+              className="w-full h-12 rounded-xl text-base font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all active:scale-[0.98]"
               disabled={!selected || submitting}
               onClick={handleSubmit}
             >
@@ -103,7 +97,7 @@ const ReportDelaySheet = ({ open, onClose, onSubmit }: ReportDelaySheetProps) =>
                 "Submit Report"
               )}
             </Button>
-            <Button variant="ghost" className="w-full" onClick={handleClose} disabled={submitting}>
+            <Button variant="ghost" className="w-full rounded-xl" onClick={handleClose} disabled={submitting}>
               Cancel
             </Button>
           </div>

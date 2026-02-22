@@ -30,16 +30,16 @@ interface ActiveTrip {
 
 const getGreeting = () => {
   const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+  if (h < 12) return { text: "Good morning", emoji: "🌅" };
+  if (h < 17) return { text: "Good afternoon", emoji: "☀️" };
+  return { text: "Good evening", emoji: "🌙" };
 };
 
-const batteryLabel = (tier: BatteryTier): string | null => {
+const batteryLabel = (tier: BatteryTier): { text: string; color: string } | null => {
   switch (tier) {
-    case "reduced": return "🔋 Reduced GPS (battery saving)";
-    case "minimal": return "🔋 Minimal GPS (low battery ⚠️)";
-    case "charging": return "⚡ Charging — Full GPS active";
+    case "reduced": return { text: "🔋 Reduced GPS (battery saving)", color: "bg-warning/10 border-warning/30 text-warning" };
+    case "minimal": return { text: "🔋 Minimal GPS (low battery ⚠️)", color: "bg-destructive/10 border-destructive/30 text-destructive" };
+    case "charging": return { text: "⚡ Charging — Full GPS active", color: "bg-success/10 border-success/30 text-success" };
     default: return null;
   }
 };
@@ -61,11 +61,9 @@ const DriverPage = () => {
   const [loadingResume, setLoadingResume] = useState(true);
   const [gpsDenied, setGpsDenied] = useState(false);
 
-  // Delay state
   const [sheetOpen, setSheetOpen] = useState(false);
   const [delayReason, setDelayReason] = useState<string | null>(null);
 
-  // GPS broadcasting
   const {
     pingCount, gpsError, batteryTier, isOnline,
     queueSize, flushProgress, reconnectMsg, queueTrimmed, cleanup: cleanupGps,
@@ -75,7 +73,6 @@ const DriverPage = () => {
     active: !!activeTripId && !!activeTrip && !gpsDenied,
   });
 
-  // Detect GPS denied from gpsError
   useEffect(() => {
     if (gpsError && gpsError.toLowerCase().includes("denied")) {
       setGpsDenied(true);
@@ -95,7 +92,6 @@ const DriverPage = () => {
     );
   };
 
-  // Fetch profile + buses + routes
   useEffect(() => {
     if (!user) return;
     const load = async () => {
@@ -111,7 +107,6 @@ const DriverPage = () => {
     load();
   }, [user]);
 
-  // Check for existing active trip on mount (trip resume)
   useEffect(() => {
     if (!user) return;
     const checkActive = async () => {
@@ -334,31 +329,34 @@ const DriverPage = () => {
     }
   };
 
-  const batLabel = batteryLabel(batteryTier);
+  const batInfo = batteryLabel(batteryTier);
+  const greeting = getGreeting();
 
   // GPS Permission Denied full-screen
   if (gpsDenied && activeTrip) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="min-h-screen bg-background flex items-center justify-center px-6 safe-top safe-bottom">
         <div className="max-w-sm w-full text-center space-y-6">
-          <div className="text-5xl">📍</div>
-          <h2 className="text-xl font-bold text-foreground">Location Required</h2>
-          <p className="text-sm text-muted-foreground">
+          <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-4xl">📍</span>
+          </div>
+          <h2 className="text-xl font-bold tracking-tight text-foreground">Location Required</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
             UniRoute needs GPS access to broadcast your bus location to students.
           </p>
-          <div className="text-left bg-muted/50 rounded-lg p-4 space-y-2 text-sm text-foreground">
-            <p className="font-medium">To enable:</p>
-            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+          <div className="text-left bg-card rounded-xl border border-border p-4 space-y-2 text-sm shadow-sm">
+            <p className="font-semibold text-foreground">To enable:</p>
+            <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
               <li>Click the 🔒 lock icon in your browser address bar</li>
               <li>Set Location to "Allow"</li>
               <li>Refresh this page</li>
             </ol>
           </div>
           <div className="space-y-3">
-            <Button className="w-full" onClick={handleRetryGps}>
+            <Button className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold" onClick={handleRetryGps}>
               Try Again
             </Button>
-            <Button variant="outline" className="w-full" onClick={() => window.location.reload()}>
+            <Button variant="outline" className="w-full h-12 rounded-xl" onClick={() => window.location.reload()}>
               Refresh Page
             </Button>
           </div>
@@ -368,73 +366,82 @@ const DriverPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Offline / Online banner */}
       {activeTrip && !isOnline && (
-        <div className="bg-red-600 text-white text-center text-sm font-medium px-4 py-2">
+        <div className="bg-destructive text-destructive-foreground text-center text-sm font-medium px-4 py-2.5 safe-top">
           📡 No Connection — GPS points queued locally
-          {queueSize > 0 && <span className="ml-2">⏳ {queueSize} point{queueSize !== 1 ? "s" : ""} queued</span>}
+          {queueSize > 0 && <span className="ml-2 opacity-80">⏳ {queueSize} point{queueSize !== 1 ? "s" : ""} queued</span>}
         </div>
       )}
       {flushProgress && (
-        <div className="bg-emerald-600 text-white text-center text-sm font-medium px-4 py-2">
+        <div className="bg-success text-success-foreground text-center text-sm font-medium px-4 py-2.5">
           {flushProgress}
         </div>
       )}
       {reconnectMsg && !flushProgress && (
-        <div className="bg-emerald-600 text-white text-center text-sm font-medium px-4 py-2">
+        <div className="bg-success text-success-foreground text-center text-sm font-medium px-4 py-2.5">
           {reconnectMsg}
         </div>
       )}
 
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h1 className="text-lg font-bold text-foreground">UniRoute Driver</h1>
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
-          <LogOut className="mr-1 h-4 w-4" />
-          Logout
+      <header className="flex items-center justify-between border-b border-border bg-card px-5 py-3.5 shadow-sm safe-top">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🚌</span>
+          <h1 className="text-lg font-bold tracking-tight text-foreground">UniRoute</h1>
+        </div>
+        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground gap-1.5">
+          <LogOut className="h-4 w-4" />
+          <span className="text-sm">Logout</span>
         </Button>
       </header>
 
-      <main className="mx-auto max-w-md px-4 py-6 space-y-6">
+      <main className="flex-1 mx-auto w-full max-w-md px-5 py-6 space-y-5">
         {/* Greeting */}
-        <p className="text-lg text-foreground">
-          {getGreeting()}, <span className="font-semibold">{displayName}</span>
-        </p>
+        <div className="space-y-0.5">
+          <p className="text-lg text-foreground">
+            {greeting.emoji} {greeting.text}, <span className="font-bold">{displayName}</span>
+          </p>
+          {!activeTrip && !resumeTrip && !loadingResume && (
+            <p className="text-sm text-muted-foreground">Ready to start your trip?</p>
+          )}
+        </div>
 
         {/* GPS Error (non-denied) */}
         {gpsError && !gpsDenied && (
-          <div className="rounded-lg border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium">
             {gpsError}
           </div>
         )}
 
         {/* Queue trimmed warning */}
         {queueTrimmed && (
-          <div className="rounded-lg border border-amber-500 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 font-medium">
+          <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning font-medium">
             ⚠️ Extended offline period detected. Some GPS history may be incomplete.
           </div>
         )}
 
         {/* Trip Resume Banner */}
         {!activeTrip && resumeTrip && (
-          <div className="rounded-lg border border-blue-500 bg-blue-500/10 px-4 py-4 space-y-3">
-            <p className="text-sm font-semibold text-foreground">🔄 You have an active trip in progress</p>
-            <p className="text-sm text-muted-foreground">
-              {resumeTrip.busName} — {resumeTrip.routeName}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Started at {formatTime(resumeTrip.startedAt)}
-            </p>
+          <div className="rounded-xl border border-secondary/30 bg-secondary/10 p-5 space-y-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔄</span>
+              <p className="text-sm font-bold text-foreground">Active trip in progress</p>
+            </div>
+            <div className="space-y-1 text-sm text-muted-foreground">
+              <p>{resumeTrip.busName} — {resumeTrip.routeName}</p>
+              <p>Started at {formatTime(resumeTrip.startedAt)}</p>
+            </div>
             <div className="flex gap-3">
               <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="flex-1 h-11 rounded-xl bg-success hover:bg-success/90 text-success-foreground font-semibold"
                 onClick={handleResumeTrip}
               >
                 Resume Trip
               </Button>
               <Button
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                className="flex-1 h-11 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold"
                 disabled={ending}
                 onClick={handleEndResumedTrip}
               >
@@ -446,20 +453,20 @@ const DriverPage = () => {
 
         {!activeTrip && !resumeTrip ? (
           loadingResume ? (
-            <div className="flex justify-center py-8">
+            <div className="flex justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="space-y-5">
-              <h2 className="text-base font-semibold text-foreground">Start Your Trip</h2>
+            <div className="bg-card rounded-xl border border-border shadow-sm p-5 space-y-5">
+              <h2 className="text-base font-bold tracking-tight text-foreground">Start Your Trip</h2>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Select Your Bus</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Select Your Bus</label>
                 <Select value={selectedBus} onValueChange={setSelectedBus}>
-                  <SelectTrigger className="bg-background">
+                  <SelectTrigger className="h-12 rounded-xl bg-background border-border">
                     <SelectValue placeholder="Choose a bus…" />
                   </SelectTrigger>
-                  <SelectContent className="bg-popover z-50">
+                  <SelectContent className="bg-popover z-50 rounded-xl">
                     {buses.length === 0 && (
                       <SelectItem value="__none" disabled>No buses assigned</SelectItem>
                     )}
@@ -472,13 +479,13 @@ const DriverPage = () => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Select Route</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Select Route</label>
                 <Select value={selectedRoute} onValueChange={setSelectedRoute}>
-                  <SelectTrigger className="bg-background">
+                  <SelectTrigger className="h-12 rounded-xl bg-background border-border">
                     <SelectValue placeholder="Choose a route…" />
                   </SelectTrigger>
-                  <SelectContent className="bg-popover z-50">
+                  <SelectContent className="bg-popover z-50 rounded-xl">
                     {routes.length === 0 && (
                       <SelectItem value="__none" disabled>No routes available</SelectItem>
                     )}
@@ -490,32 +497,44 @@ const DriverPage = () => {
               </div>
 
               <Button
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-lg py-6"
+                className={`w-full h-14 rounded-xl text-lg font-bold shadow-md transition-all active:scale-[0.98] bg-primary hover:bg-primary/90 text-primary-foreground ${
+                  selectedBus && selectedRoute ? "animate-pulse" : ""
+                }`}
                 disabled={!selectedBus || !selectedRoute || starting}
                 onClick={handleStartTrip}
               >
                 {starting ? (
                   <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Starting…</>
                 ) : (
-                  "START TRIP 🚌"
+                  <>🚌 START TRIP</>
                 )}
               </Button>
             </div>
           )
         ) : activeTrip ? (
-          <div className="space-y-5">
-            {/* Active banner */}
-            <div className="rounded-lg bg-emerald-600 px-4 py-3 text-center text-white font-semibold text-base">
-              🟢 Trip Active
+          <div className="space-y-4">
+            {/* Active trip header */}
+            <div className="bg-sidebar rounded-xl px-5 py-4 flex items-center justify-between shadow-sm">
+              <div className="space-y-0.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">Active Trip</p>
+                <p className="text-base font-bold text-sidebar-foreground">{activeTrip.routeName}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-success"></span>
+                </span>
+                <span className="text-sm font-semibold text-success">LIVE</span>
+              </div>
             </div>
 
             {/* Delay banner */}
             {delayReason && (
-              <div className="rounded-lg bg-amber-500/15 border border-amber-500 px-4 py-2">
-                <p className="text-sm text-amber-600 font-medium">⚠️ Delay reported — {delayReason}</p>
+              <div className="rounded-xl bg-warning/10 border border-warning/30 px-4 py-3 flex items-center justify-between">
+                <p className="text-sm text-warning font-medium">⚠️ {delayReason}</p>
                 <button
                   onClick={handleResolveDelay}
-                  className="mt-1 text-xs font-medium text-emerald-600 hover:underline"
+                  className="text-xs font-semibold text-success hover:underline ml-2 shrink-0"
                 >
                   ✅ Resolved
                 </button>
@@ -523,55 +542,56 @@ const DriverPage = () => {
             )}
 
             {/* Battery tier indicator */}
-            {batLabel && (
-              <div className="rounded-lg bg-amber-500/10 border border-amber-500 px-4 py-2 text-sm text-amber-600 font-medium">
-                {batLabel}
+            {batInfo && (
+              <div className={`rounded-xl border px-4 py-2.5 text-sm font-medium ${batInfo.color}`}>
+                {batInfo.text}
               </div>
             )}
 
-            <div className="space-y-2 rounded-lg border border-border p-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Bus</span>
-                <span className="font-medium text-foreground">{activeTrip.busName}</span>
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Bus</p>
+                <p className="text-sm font-bold text-foreground">{activeTrip.busName}</p>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Route</span>
-                <span className="font-medium text-foreground">{activeTrip.routeName}</span>
+              <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Route</p>
+                <p className="text-sm font-bold text-foreground">{activeTrip.routeName}</p>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Started</span>
-                <span className="font-medium text-foreground">{formatTime(activeTrip.startedAt)}</span>
+              <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Started</p>
+                <p className="text-sm font-bold text-foreground">{formatTime(activeTrip.startedAt)}</p>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">GPS Pings Sent</span>
-                <span className="font-mono font-medium text-foreground">{pingCount}</span>
+              <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">GPS Pings</p>
+                <p className="text-sm font-bold font-mono text-foreground">{pingCount}</p>
+                {queueSize > 0 && (
+                  <p className="text-xs text-warning font-medium mt-0.5">+{queueSize} queued</p>
+                )}
               </div>
-              {queueSize > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Queued (offline)</span>
-                  <span className="font-mono font-medium text-amber-600">{queueSize}</span>
-                </div>
-              )}
             </div>
 
-            <Button
-              className="w-full bg-red-600 hover:bg-red-700 text-white text-lg py-6"
-              disabled={ending}
-              onClick={handleEndTrip}
-            >
-              {ending ? (
-                <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Ending…</>
-              ) : (
-                "END TRIP"
-              )}
-            </Button>
+            {/* Action buttons */}
+            <div className="space-y-3 pt-2">
+              <Button
+                className="w-full h-14 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground text-lg font-bold shadow-md transition-all active:scale-[0.98]"
+                disabled={ending}
+                onClick={handleEndTrip}
+              >
+                {ending ? (
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Ending…</>
+                ) : (
+                  "🛑 END TRIP"
+                )}
+              </Button>
 
-            <Button
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white text-lg py-6"
-              onClick={() => setSheetOpen(true)}
-            >
-              {delayReason ? "UPDATE DELAY ⚠️" : "REPORT DELAY ⚠️"}
-            </Button>
+              <Button
+                className="w-full h-14 rounded-xl bg-warning hover:bg-warning/90 text-warning-foreground text-lg font-bold shadow-md transition-all active:scale-[0.98]"
+                onClick={() => setSheetOpen(true)}
+              >
+                {delayReason ? "📝 UPDATE REPORT" : "⚠️ REPORT DELAY"}
+              </Button>
+            </div>
           </div>
         ) : null}
       </main>
