@@ -3,12 +3,13 @@ import { toast } from "@/hooks/use-toast";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useMapData, type BusLocation, type Stop } from "@/hooks/useMapData";
-import { calculateETAsForStop, recordSpeed, type BusETA } from "@/lib/eta";
+import { calculateETAsForStop, recordPing, type BusETA } from "@/lib/eta";
+import { seedHistory } from "@/lib/etaEngine";
 import ScheduleView from "@/components/ScheduleView";
 import NotificationSheet from "@/components/NotificationSheet";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
-import { Bus, Star, MapPin, Bell, BellRing, BellOff, Map as MapIcon, ClipboardList, Clock, AlertTriangle, X, CheckCircle2, UserCheck } from "lucide-react";
+import { Bus, Star, MapPin, Bell, BellRing, BellOff, Map as MapIcon, ClipboardList, Clock, AlertTriangle, X, CheckCircle2, UserCheck, Gauge, Navigation } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import OccupancyBar from "@/components/OccupancyBar";
 import CountdownTimer from "@/components/CountdownTimer";
@@ -212,8 +213,38 @@ const MapPage = () => {
     if (mapRef.current) mapRef.current.setView([match.lat, match.lng], 16, { animate: true });
   }, [favouriteStop, stops]);
 
-  // Record speeds
-  useEffect(() => { for (const bus of buses) recordSpeed(bus.busId, bus.speedKmh); }, [buses]);
+  // Record pings for rolling speed calculation
+  useEffect(() => {
+    for (const bus of buses) {
+      recordPing(bus.busId, { lat: bus.lat, lng: bus.lng, timestamp: bus.timestamp, speed_kmh: bus.speedKmh });
+    }
+  }, [buses]);
+
+  // Seed historical pings on mount for each bus
+  const seededRef = useRef(new Set<string>());
+  useEffect(() => {
+    const fetchHistory = async () => {
+      for (const bus of buses) {
+        if (seededRef.current.has(bus.busId)) continue;
+        seededRef.current.add(bus.busId);
+        const { data } = await supabase
+          .from("live_locations")
+          .select("lat, lng, timestamp, speed_kmh")
+          .eq("bus_id", bus.busId)
+          .order("timestamp", { ascending: false })
+          .limit(10);
+        if (data && data.length > 0) {
+          seedHistory(bus.busId, data.map((d) => ({
+            lat: Number(d.lat),
+            lng: Number(d.lng),
+            timestamp: d.timestamp,
+            speed_kmh: Number(d.speed_kmh ?? 0),
+          })));
+        }
+      }
+    };
+    if (buses.length > 0) fetchHistory();
+  }, [buses]);
 
   // Recalculate ETAs
   useEffect(() => {
@@ -441,14 +472,14 @@ const MapPage = () => {
                     ) : (
                       <div className="space-y-2 mt-1">
                         {etas.map((eta) => {
-                          const isStale = staleBuses.has(eta.busId);
+                          const isStale = eta.stale;
                           const bus = buses.find((b) => b.busId === eta.busId);
                           const occ = bus ? occupancy.get(bus.tripId) : undefined;
                           const tripId = bus?.tripId;
                           const alreadyCheckedIn = tripId ? (hasCheckedIn(tripId) || checkedInTrip === tripId) : false;
 
                           return (
-                            <div key={eta.busId} className={`rounded-xl px-3 py-2.5 ${isStale ? "bg-muted/40 border border-dashed border-muted-foreground/20" : "bg-muted/40"}`}>
+                            <div key={eta.busId} className={`rounded-xl px-3 py-2.5 ${eta.stale ? "bg-muted/40 border border-dashed border-muted-foreground/20" : "bg-muted/40"}`}>
                               <div className="flex items-center justify-between">
                                 <span className="text-sm font-semibold text-foreground flex items-center gap-1"><Bus className="h-3.5 w-3.5" /> {eta.busName}</span>
                                 <div className="flex items-center gap-1.5">
@@ -461,15 +492,49 @@ const MapPage = () => {
                                 </div>
                               </div>
                               {occ && <div className="mt-1.5"><OccupancyBar info={occ} compact /></div>}
-                              {isStale ? (
+
+                              {/* ETA message with type-based styling */}
+                              {eta.type === "stale" ? (
                                 <>
-                                  <p className="text-sm mt-0.5 text-warning font-medium flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Bus location unavailable</p>
-                                  <p className="text-xs text-muted-foreground mt-0.5">Last seen {timeAgo(eta.timestamp)}</p>
+                                  <p className="text-sm mt-1 text-warning font-medium flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> {eta.message}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">Last seen {eta.lastSeenAgo ?? timeAgo(eta.timestamp)}</p>
                                 </>
+                              ) : eta.type === "stopped" ? (
+                                <>
+                                  <p className="text-sm mt-1 text-amber-600 font-medium">{eta.message}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">Updated: {eta.lastSeenAgo ?? timeAgo(eta.timestamp)}</p>
+                                </>
+                              ) : eta.type === "passed" ? (
+                                <p className="text-sm mt-1 text-muted-foreground">{eta.message}</p>
+                              ) : eta.type === "arriving" ? (
+                                <p className="text-sm mt-1 text-success font-semibold flex items-center gap-1">
+                                  <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-success" /></span>
+                                  {eta.message}
+                                </p>
                               ) : (
                                 <>
-                                  <p className="text-sm mt-0.5 font-medium">{eta.label}</p>
-                                  <p className="text-xs text-muted-foreground mt-0.5">Updated: {Math.floor((Date.now() - new Date(eta.timestamp).getTime()) / 1000)}s ago</p>
+                                  <p className={`text-sm mt-1 font-medium ${eta.confidence === "low" ? "text-muted-foreground" : "text-foreground"}`}>
+                                    {eta.message}{eta.confidence === "low" ? "?" : ""}
+                                  </p>
+                                  {/* Distance progress bar */}
+                                  {eta.distanceKm != null && eta.routeProgressPercent != null && (
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                        <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${Math.min(100, eta.routeProgressPercent)}%` }} />
+                                      </div>
+                                      <span className="text-[10px] text-muted-foreground font-medium shrink-0">{eta.distanceKm} km</span>
+                                    </div>
+                                  )}
+                                  {/* Speed & updated info */}
+                                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                    {eta.speedKmh != null && eta.speedKmh > 0 && (
+                                      <span className="flex items-center gap-0.5"><Gauge className="h-3 w-3" /> {eta.speedKmh} km/h</span>
+                                    )}
+                                    <span>Updated: {eta.lastSeenAgo ?? timeAgo(eta.timestamp)}</span>
+                                  </div>
+                                  {eta.confidence === "low" && (
+                                    <p className="text-[10px] text-muted-foreground/70 mt-0.5">Estimate may vary</p>
+                                  )}
                                 </>
                               )}
                               {/* I'm on this bus button */}
