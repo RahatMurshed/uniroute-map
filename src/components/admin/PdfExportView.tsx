@@ -21,8 +21,8 @@ export default function PdfExportView() {
   const [includeOverrides, setIncludeOverrides] = useState(true);
   const [includeDriverInfo, setIncludeDriverInfo] = useState(true);
   const [includeGpsStats, setIncludeGpsStats] = useState(false);
-  const [universityName, setUniversityName] = useState("University Transport Services");
-  const [footerNote, setFooterNote] = useState("For queries contact transport office");
+  const [universityName, setUniversityName] = useState("Metropolitan University");
+  const [footerNote, setFooterNote] = useState("Metropolitan University Transport Services");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -86,8 +86,8 @@ export default function PdfExportView() {
       includeOverrides: true,
       includeDriverInfo: true,
       includeGpsStats: false,
-      universityName: "University Transport Services",
-      footerNote: "For queries contact transport office",
+      universityName: "Metropolitan University",
+      footerNote: "Metropolitan University Transport Services",
     };
     downloadPdf(quickOptions);
     toast.success("Quick export downloaded");

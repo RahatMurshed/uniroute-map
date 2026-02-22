@@ -3,25 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>UniRoute — Bus Tracker</title>
-    <meta name="description" content="Real-time university bus tracking. See live bus locations, ETAs, and schedules.">
-    <meta name="author" content="UniRoute" />
-    <meta name="theme-color" content="#E8440A" />
+    <title>MU Bus Tracker</title>
+    <meta name="description" content="Metropolitan University real-time bus tracking. See live bus locations, ETAs, and schedules.">
+    <meta name="author" content="Metropolitan University" />
+    <meta name="theme-color" content="#CC1B1B" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="UniRoute" />
+    <meta name="apple-mobile-web-app-title" content="MU Bus" />
 
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" href="/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
 
-    <meta property="og:title" content="UniRoute — Bus Tracker">
-    <meta property="og:description" content="Real-time university bus tracking. See live bus locations, ETAs, and schedules.">
+    <meta property="og:title" content="MU Bus Tracker">
+    <meta property="og:description" content="Metropolitan University real-time bus tracking. See live bus locations, ETAs, and schedules.">
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/87b66911-799c-4df4-b6b1-cb2513a68c7f/id-preview-ea84a911--16957694-8a89-440e-bafa-ebb447f9aad4.lovable.app-1771668160348.png">
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="UniRoute — Bus Tracker">
-    <meta name="twitter:description" content="Real-time university bus tracking">
+    <meta name="twitter:title" content="MU Bus Tracker">
+    <meta name="twitter:description" content="Metropolitan University real-time bus tracking">
     <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/87b66911-799c-4df4-b6b1-cb2513a68c7f/id-preview-ea84a911--16957694-8a89-440e-bafa-ebb447f9aad4.lovable.app-1771668160348.png">
 
     <!-- Loading screen styles -->
@@ -30,7 +30,7 @@
         position: fixed;
         inset: 0;
         z-index: 99999;
-        background: #E8440A;
+        background: #1A1A2E;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -42,16 +42,23 @@
         opacity: 0;
         pointer-events: none;
       }
-      #splash-screen .icon {
-        font-size: 64px;
+      #splash-screen .logo-img {
+        width: 80px;
+        height: 80px;
+        object-fit: contain;
         animation: pulse 1.5s ease-in-out infinite;
       }
       #splash-screen .name {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        font-size: 28px;
+        font-size: 24px;
         font-weight: 700;
         color: white;
         letter-spacing: -0.5px;
+      }
+      #splash-screen .subtitle {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px;
+        color: rgba(255,255,255,0.6);
       }
       #splash-screen .dots {
         display: flex;
@@ -80,8 +87,9 @@
   <body>
     <!-- Loading splash screen -->
     <div id="splash-screen">
-      <div class="icon">🚌</div>
-      <div class="name">UniRoute</div>
+      <img src="/metropolitan-logo.png" alt="Metropolitan University" class="logo-img" />
+      <div class="name">MU Bus Tracker</div>
+      <div class="subtitle">Metropolitan University Transport</div>
       <div class="dots"><span></span><span></span><span></span></div>
     </div>
 

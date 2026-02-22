@@ -324,8 +324,9 @@ const MapPage = () => {
 
           {/* ── Top bar ── */}
           <div className="fixed top-0 left-0 right-0 z-[1000] flex items-center justify-between px-4 py-3 pointer-events-none safe-top">
-            <div className="pointer-events-auto rounded-2xl bg-card/80 backdrop-blur-xl shadow-md border border-border/50 px-4 py-2.5">
-              <span className="text-lg font-extrabold tracking-tight text-foreground flex items-center gap-1.5"><Bus className="h-5 w-5 text-primary" /> UniRoute</span>
+            <div className="pointer-events-auto rounded-2xl bg-card/80 backdrop-blur-xl shadow-md border border-border/50 px-4 py-2.5 flex items-center gap-2">
+              <img src="/metropolitan-logo.png" alt="MU" className="h-6 w-6 object-contain" />
+              <span className="text-base font-extrabold tracking-tight text-foreground">MU Bus Tracker</span>
             </div>
 
             <div className="flex items-center gap-2 pointer-events-auto">
