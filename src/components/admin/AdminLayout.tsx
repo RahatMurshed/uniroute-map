@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Route, CalendarClock, Users, BarChart3, FileDown, LogOut, Bus } from "lucide-react";
+import { LayoutDashboard, Route, CalendarClock, Users, BarChart3, FileDown, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export type AdminView = "fleet" | "routes" | "overrides" | "drivers" | "reports" | "export";
@@ -48,14 +48,16 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Desktop Sidebar — dark */}
+      {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-64 flex-col bg-sidebar shrink-0">
         <div className="p-5 border-b border-sidebar-border">
-          <div className="flex items-center gap-2">
-            <Bus className="h-6 w-6 text-sidebar-primary" />
-            <h1 className="text-lg font-extrabold tracking-tight text-sidebar-foreground">UniRoute</h1>
+          <div className="flex items-center gap-3">
+            <img src="/metropolitan-logo.png" alt="Metropolitan University" className="h-8 w-8 object-contain" />
+            <div>
+              <h1 className="text-base font-extrabold tracking-tight text-sidebar-foreground">MU Transport</h1>
+              <p className="text-xs text-sidebar-foreground/50">Admin Dashboard</p>
+            </div>
           </div>
-          <p className="text-xs text-sidebar-foreground/50 mt-0.5 ml-8">Admin Dashboard</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => (
@@ -74,7 +76,6 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
           ))}
         </nav>
         <div className="p-3 border-t border-sidebar-border space-y-3">
-          {/* User info */}
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sm font-bold text-sidebar-accent-foreground">
               {(displayName ?? "A").charAt(0).toUpperCase()}
@@ -99,7 +100,7 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
         {/* Header */}
         <header className="shrink-0 h-14 flex items-center justify-between px-5 border-b border-border bg-card shadow-sm">
           <h2 className="text-base font-bold tracking-tight text-card-foreground md:hidden flex items-center gap-2">
-            <Bus className="h-5 w-5 text-primary" /> UniRoute
+            <img src="/metropolitan-logo.png" alt="MU" className="h-6 w-6 object-contain" /> MU Transport
           </h2>
           <h2 className="text-base font-bold tracking-tight text-card-foreground hidden md:flex items-center gap-2">
             {navItems.find((n) => n.id === activeView)?.icon}

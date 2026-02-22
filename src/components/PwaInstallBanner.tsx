@@ -49,7 +49,7 @@ export default function PwaInstallBanner() {
   if (installed) {
     return (
       <div className="fixed bottom-20 left-4 right-4 z-[1100] mx-auto max-w-md rounded-2xl bg-success text-success-foreground p-4 text-center shadow-lg">
-        <p className="font-semibold">UniRoute installed!</p>
+        <p className="font-semibold">MU Bus Tracker installed!</p>
       </div>
     );
   }
@@ -58,7 +58,7 @@ export default function PwaInstallBanner() {
     return (
       <div className="fixed bottom-20 left-4 right-4 z-[1100] mx-auto max-w-md rounded-2xl bg-background/95 backdrop-blur-md shadow-lg border border-border p-4">
         <div className="space-y-3">
-          <p className="font-semibold text-foreground flex items-center gap-2"><Bus className="h-5 w-5 text-primary" /> Add UniRoute to Home Screen</p>
+          <p className="font-semibold text-foreground flex items-center gap-2"><Bus className="h-5 w-5 text-primary" /> Add MU Bus Tracker to Home Screen</p>
           <ol className="text-sm text-muted-foreground space-y-1.5 list-inside">
             <li>1. Tap the <strong>Share</strong> button</li>
             <li>2. Select <strong>"Add to Home Screen"</strong></li>
@@ -76,7 +76,7 @@ export default function PwaInstallBanner() {
     <div className="fixed bottom-20 left-4 right-4 z-[1100] mx-auto max-w-md rounded-2xl bg-background/95 backdrop-blur-md shadow-lg border border-border p-4">
       <div className="flex items-start gap-3">
         <div className="flex-1">
-          <p className="font-semibold text-foreground flex items-center gap-2"><Bus className="h-5 w-5 text-primary" /> Install UniRoute</p>
+          <p className="font-semibold text-foreground flex items-center gap-2"><Bus className="h-5 w-5 text-primary" /> Install MU Bus Tracker</p>
           <p className="text-sm text-muted-foreground mt-0.5">Get instant bus alerts on your home screen — works offline too!</p>
         </div>
       </div>
