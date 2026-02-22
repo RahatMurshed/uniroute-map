@@ -1,27 +1,28 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "@/styles/leaflet-custom.css";
+import { TILE_URL, TILE_ATTRIBUTION, DEFAULT_CENTER, MU_RED, MU_AMBER, MU_GREY } from "@/lib/mapConfig";
 import type { AdminBus } from "@/hooks/useAdminData";
 
-const DEFAULT_CENTER: L.LatLngTuple = [23.8103, 90.4125];
-
 function getBusColor(bus: AdminBus): string {
-  if (!bus.tripStatus) return "#6b7280"; // inactive grey
-  if (bus.tripStatus === "delayed") return "#eab308"; // yellow
+  if (!bus.tripStatus) return MU_GREY;
+  if (bus.tripStatus === "delayed") return MU_AMBER;
   if (bus.lastPing) {
     const age = (Date.now() - new Date(bus.lastPing).getTime()) / 1000;
-    if (age > 120) return "#ef4444"; // red - offline
+    if (age > 120) return MU_GREY;
   }
-  return "#22c55e"; // green - active
+  return MU_RED;
 }
 
 function makeBusIcon(color: string) {
+  const isInactive = color === MU_GREY;
   return L.divIcon({
     className: "",
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -18],
-    html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid white;">🚌</div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -24],
+    html: `<div style="width:40px;height:40px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 14px rgba(0,0,0,.25);border:3px solid white;opacity:${isInactive ? '0.5' : '1'};">🚌</div>`,
   });
 }
 
@@ -40,12 +41,14 @@ export default function AdminFleetMap({ buses, centerOnBusId, onCenterDone }: Ad
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, {
       center: DEFAULT_CENTER,
-      zoom: 14,
-      zoomControl: true,
+      zoom: 16,
+      zoomControl: false,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
     });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
-    }).addTo(map);
+    L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION }).addTo(map);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    L.control.scale({ position: "bottomleft", imperial: false }).addTo(map);
     mapRef.current = map;
 
     return () => {
@@ -66,7 +69,16 @@ export default function AdminFleetMap({ buses, centerOnBusId, onCenterDone }: Ad
       activeBusIds.add(bus.id);
       const color = getBusColor(bus);
       const existing = markersRef.current.get(bus.id);
-      const popupContent = `<strong>${bus.name}</strong><br/>Status: ${bus.tripStatus ?? "Inactive"}<br/>${bus.routeName ? `Route: ${bus.routeName}` : ""}`;
+      const popupContent = `<div style="padding:12px 14px;min-width:180px;font-family:Inter,system-ui,sans-serif;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${bus.name}</div>
+        <div style="border-top:1px solid #e5e7eb;padding-top:8px;margin-top:4px;">
+          <div style="display:flex;align-items:center;font-size:12px;margin-bottom:3px;">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px;"></span>
+            ${bus.tripStatus ?? "Inactive"}
+          </div>
+          ${bus.routeName ? `<div style="font-size:12px;color:#6b7280;">Route: ${bus.routeName}</div>` : ""}
+        </div>
+      </div>`;
 
       if (existing) {
         existing.setLatLng([bus.lat, bus.lng]);
