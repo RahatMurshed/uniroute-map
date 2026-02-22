@@ -6,7 +6,7 @@ import type { TripDetailData } from "@/hooks/useReportsData";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "@/styles/leaflet-custom.css";
-import { TILE_URL, TILE_URL_FALLBACK, TILE_ATTRIBUTION, TILE_ATTRIBUTION_FALLBACK } from "@/lib/mapConfig";
+import { TILE_URL, TILE_ATTRIBUTION } from "@/lib/mapConfig";
 
 interface Props {
   open: boolean;
@@ -21,11 +21,8 @@ function TripMap({ locations }: { locations: { lat: number; lng: number }[] }) {
   useEffect(() => {
     if (!mapRef.current || locations.length === 0) return;
     const map = L.map(mapRef.current, { zoomControl: false, scrollWheelZoom: true, doubleClickZoom: true }).setView([locations[0].lat, locations[0].lng], 16);
-    const stadia = L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION });
-    const fallback = L.tileLayer(TILE_URL_FALLBACK, { attribution: TILE_ATTRIBUTION_FALLBACK });
-    let usedFallback = false;
-    stadia.on("tileerror", () => { if (!usedFallback) { usedFallback = true; map.removeLayer(stadia); fallback.addTo(map); } });
-    stadia.addTo(map);
+    L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION }).addTo(map);
+    
     L.control.zoom({ position: "bottomright" }).addTo(map);
     const coords: L.LatLngExpression[] = locations.map(l => [l.lat, l.lng]);
     L.polyline(coords, { color: "#CC1B1B", weight: 4, opacity: 0.8 }).addTo(map);

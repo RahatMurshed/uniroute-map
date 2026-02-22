@@ -4,7 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-polylinedecorator";
 import "@/styles/leaflet-custom.css";
-import { TILE_URL, TILE_URL_FALLBACK, TILE_ATTRIBUTION, TILE_ATTRIBUTION_FALLBACK, MU_RED, MU_AMBER, MU_GREY } from "@/lib/mapConfig";
+import { TILE_URL, TILE_ATTRIBUTION, MU_RED, MU_AMBER, MU_GREY } from "@/lib/mapConfig";
 import { useMapData, type BusLocation, type Stop } from "@/hooks/useMapData";
 import { calculateETAsForStop, recordPing, type BusETA } from "@/lib/eta";
 import { seedHistory } from "@/lib/etaEngine";
@@ -274,18 +274,7 @@ const MapPage = () => {
     if (!containerRef.current || mapRef.current) return;
     const map = L.map(containerRef.current, { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, zoomControl: false, scrollWheelZoom: true, doubleClickZoom: true });
 
-    const stadiaLayer = L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION });
-    const fallbackLayer = L.tileLayer(TILE_URL_FALLBACK, { attribution: TILE_ATTRIBUTION_FALLBACK });
-
-    let usedFallback = false;
-    stadiaLayer.on("tileerror", () => {
-      if (!usedFallback) {
-        usedFallback = true;
-        map.removeLayer(stadiaLayer);
-        fallbackLayer.addTo(map);
-      }
-    });
-    stadiaLayer.addTo(map);
+    L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION }).addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
     L.control.scale({ position: "bottomleft", imperial: false }).addTo(map);
