@@ -1,13 +1,11 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Loader2, X, Clock, Construction, Wrench, XCircle, AlertOctagon } from "lucide-react";
+import { Loader2, X, Clock, Construction, Wrench, XCircle, AlertOctagon, ChevronRight } from "lucide-react";
 
 const ISSUE_OPTIONS = [
-  { key: "late", label: "Running Late", delayLabel: "Running Late", icon: <Clock className="h-5 w-5" /> },
-  { key: "blockage", label: "Road Blockage", delayLabel: "Road Blockage", icon: <Construction className="h-5 w-5" /> },
-  { key: "vehicle", label: "Vehicle Issue", delayLabel: "Vehicle Issue", icon: <Wrench className="h-5 w-5" /> },
-  { key: "cancel", label: "Cancel Trip", delayLabel: "Cancelling Trip", icon: <XCircle className="h-5 w-5" /> },
+  { key: "late", label: "Running Late", subtitle: "Inform students of delay", delayLabel: "Running Late", Icon: Clock, color: "bg-amber-500/20 text-amber-400" },
+  { key: "blockage", label: "Road Blockage", subtitle: "Report road obstruction", delayLabel: "Road Blockage", Icon: Construction, color: "bg-red-500/20 text-red-400" },
+  { key: "vehicle", label: "Vehicle Issue", subtitle: "Mechanical or technical problem", delayLabel: "Vehicle Issue", Icon: Wrench, color: "bg-blue-500/20 text-blue-400" },
+  { key: "cancel", label: "Cancel Trip", subtitle: "End trip and notify students", delayLabel: "Cancelling Trip", Icon: XCircle, color: "bg-red-500/20 text-red-400" },
 ] as const;
 
 type IssueKey = (typeof ISSUE_OPTIONS)[number]["key"];
@@ -40,21 +38,19 @@ const ReportDelaySheet = ({ open, onClose, onSubmit }: ReportDelaySheetProps) =>
         onClick={handleClose}
       />
 
-      {/* Bottom sheet */}
-      <div className={`fixed inset-x-0 bottom-0 z-50 rounded-t-3xl bg-white shadow-2xl transition-transform duration-300 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}>
+      {/* Bottom sheet - dark theme */}
+      <div className={`fixed inset-x-0 bottom-0 z-50 rounded-t-3xl bg-[#1E293B] border-t border-white/10 shadow-2xl transition-transform duration-300 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}>
         <div className="mx-auto max-w-md px-6 pb-8 pt-4 space-y-5 safe-bottom">
           {/* Handle bar */}
-          <div className="mx-auto h-1 w-10 rounded-full bg-[#E5E5E5]" />
+          <div className="mx-auto h-1 w-10 rounded-full bg-white/20" />
 
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#D97706]/10 flex items-center justify-center">
-                <AlertOctagon className="h-4 w-4 text-[#D97706]" />
-              </div>
-              <h2 className="text-lg font-bold tracking-tight text-[#1A1A2E]">Report an Issue</h2>
+              <AlertOctagon className="h-6 w-6 text-amber-400" />
+              <h2 className="text-xl font-bold text-white">Report an Issue</h2>
             </div>
-            <button onClick={handleClose} className="text-[#A8A29E] hover:text-[#1A1A2E] p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors">
+            <button onClick={handleClose} className="text-white/40 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -65,48 +61,49 @@ const ReportDelaySheet = ({ open, onClose, onSubmit }: ReportDelaySheetProps) =>
               <button
                 key={opt.key}
                 onClick={() => setSelected(opt.key)}
-                className={`w-full rounded-xl border-2 px-5 py-4 text-left transition-all min-h-[56px] active:scale-[0.98] flex items-center gap-3 ${
+                className={`w-full rounded-2xl border px-4 py-4 text-left transition-all min-h-[60px] active:scale-[0.98] flex items-center gap-3 ${
                   selected === opt.key
-                    ? "border-primary bg-primary/5 text-[#1A1A2E] shadow-sm"
-                    : "border-[#E5E5E5] bg-white text-[#1A1A2E] hover:border-[#A8A29E]"
-                } ${opt.key === "cancel" && selected === opt.key ? "border-[#DC2626] bg-red-50" : ""}`}
+                    ? "border-[#CC1B1B] bg-[#CC1B1B]/10"
+                    : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
+                }`}
               >
-                <span className={selected === opt.key ? "text-primary" : "text-[#78716C]"}>{opt.icon}</span>
-                <span className="font-semibold text-sm">{opt.label}</span>
-                {selected === opt.key && (
-                  <span className="ml-auto text-primary">
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                  </span>
-                )}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${opt.color}`}>
+                  <opt.Icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold text-white block">{opt.label}</span>
+                  <span className="text-xs text-white/40 block">{opt.subtitle}</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-white/30 shrink-0" />
               </button>
             ))}
           </div>
 
           {/* Notes */}
-          <Textarea
+          <textarea
             placeholder="Add details for students…"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="resize-none bg-[#F8F8F8] rounded-xl border-[#E5E5E5] text-[#1A1A2E] placeholder:text-[#A8A29E] min-h-[80px] text-sm"
+            className="w-full resize-none bg-white/5 rounded-2xl border border-white/10 text-white placeholder:text-white/30 min-h-[80px] text-sm px-4 py-3 focus:border-white/30 focus:outline-none transition-colors"
             rows={3}
           />
 
           {/* Actions */}
           <div className="space-y-2.5">
-            <Button
-              className="w-full h-14 rounded-xl text-base font-bold bg-primary hover:bg-[#A81515] text-white shadow-lg transition-all active:scale-[0.97]"
+            <button
+              className="w-full h-14 rounded-2xl text-base font-semibold bg-[#CC1B1B] hover:bg-[#A81515] text-white shadow-[0_4px_15px_rgba(204,27,27,0.4)] transition-all active:scale-[0.97] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
               disabled={!selected || submitting}
               onClick={handleSubmit}
             >
-              {submitting ? (<><Loader2 className="mr-2 h-5 w-5 animate-spin" />Submitting…</>) : "Submit Report"}
-            </Button>
-            <Button
-              className="w-full h-12 rounded-xl text-sm font-semibold bg-transparent hover:bg-[#F8F8F8] text-[#78716C] border border-[#E5E5E5]"
+              {submitting ? (<><Loader2 className="h-5 w-5 animate-spin" />Submitting…</>) : "Submit Report"}
+            </button>
+            <button
+              className="w-full h-12 rounded-2xl text-sm font-semibold text-white/50 hover:text-white/70 transition-colors"
               onClick={handleClose}
               disabled={submitting}
             >
               Cancel
-            </Button>
+            </button>
           </div>
         </div>
       </div>

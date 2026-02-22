@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, LogOut, Bus, MapPin, Play, Square, AlertOctagon, Radio, Navigation, Sunrise, Sun, Moon, RefreshCw, AlertTriangle, WifiOff, CheckCircle2, Battery, BatteryLow, Zap, Clock, Calendar } from "lucide-react";
+import { Loader2, LogOut, Bus, MapPin, Play, Square, AlertOctagon, Radio, Navigation, Sunrise, Sun, Moon, RefreshCw, AlertTriangle, WifiOff, CheckCircle2, Battery, BatteryLow, Zap, Clock, Calendar, ChevronRight, Timer, Gauge } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGpsBroadcast, type BatteryTier } from "@/hooks/useGpsBroadcast";
 import { ReportDelaySheet, ISSUE_OPTIONS, type IssueKey } from "@/components/ReportDelaySheet";
@@ -15,9 +15,9 @@ interface ActiveTrip { id: string; busId: string; busName: string; routeName: st
 
 const getGreeting = () => {
   const h = new Date().getHours();
-  if (h < 12) return { text: "Good morning", icon: <Sunrise className="h-6 w-6" /> };
-  if (h < 17) return { text: "Good afternoon", icon: <Sun className="h-6 w-6" /> };
-  return { text: "Good evening", icon: <Moon className="h-6 w-6" /> };
+  if (h < 12) return { text: "Good morning", Icon: Sunrise };
+  if (h < 17) return { text: "Good afternoon", Icon: Sun };
+  return { text: "Good evening", Icon: Moon };
 };
 
 const batteryLabel = (tier: BatteryTier): { text: string; color: string; icon: React.ReactNode } | null => {
@@ -35,6 +35,12 @@ function formatDuration(startIso: string): string {
   const m = Math.floor((diff % 3600) / 60);
   const s = diff % 60;
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+function gpsQuality(pingCount: number): { label: string; color: string; percent: number } {
+  if (pingCount === 0) return { label: "Waiting…", color: "bg-white/30", percent: 10 };
+  if (pingCount < 3) return { label: "Acquiring", color: "bg-amber-400", percent: 40 };
+  return { label: "Excellent", color: "bg-green-400", percent: 100 };
 }
 
 const DriverPage = () => {
@@ -57,6 +63,11 @@ const DriverPage = () => {
   const [delayReason, setDelayReason] = useState<string | null>(null);
   const [duration, setDuration] = useState("00:00:00");
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Hold-to-end state
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const holdStartRef = useRef<number | null>(null);
 
   const {
     pingCount, gpsError, batteryTier, isOnline,
@@ -179,8 +190,29 @@ const DriverPage = () => {
       setActiveTripId(null); setActiveTrip(null); setDelayReason(null);
       toast({ title: "Trip ended successfully" });
     } catch (err: any) { toast({ title: "Failed to end trip", description: err.message, variant: "destructive" }); }
-    finally { setEnding(false); }
+    finally { setEnding(false); setHoldProgress(0); }
   };
+
+  // Hold-to-end handlers
+  const startHold = useCallback(() => {
+    if (ending) return;
+    holdStartRef.current = Date.now();
+    holdTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - (holdStartRef.current || Date.now());
+      const progress = Math.min(elapsed / 2000, 1);
+      setHoldProgress(progress);
+      if (progress >= 1) {
+        cancelHold();
+        handleEndTrip();
+      }
+    }, 30);
+  }, [ending, handleEndTrip]);
+
+  const cancelHold = useCallback(() => {
+    if (holdTimerRef.current) { clearInterval(holdTimerRef.current); holdTimerRef.current = null; }
+    holdStartRef.current = null;
+    setHoldProgress(0);
+  }, []);
 
   const handleReportSubmit = async (issueKey: IssueKey, notes: string) => {
     if (!user || !activeTrip || !activeTripId) return;
@@ -239,11 +271,12 @@ const DriverPage = () => {
   const dateStr = currentTime.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "short", year: "numeric" });
   const selectedBusObj = buses.find((b) => b.id === selectedBus);
   const selectedRouteObj = routes.find((r) => r.id === selectedRoute);
+  const gpsQ = gpsQuality(pingCount);
 
   // GPS Permission Denied
   if (gpsDenied && activeTrip) {
     return (
-      <div className="min-h-screen bg-[#1A1A2E] flex items-center justify-center px-6 safe-top safe-bottom">
+      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center px-6 safe-top safe-bottom">
         <div className="max-w-sm w-full text-center space-y-6">
           <div className="w-20 h-20 mx-auto rounded-full bg-primary/20 flex items-center justify-center">
             <MapPin className="h-10 w-10 text-primary" />
@@ -270,27 +303,16 @@ const DriverPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1A2E] flex flex-col">
-      {/* Offline / Reconnect banners */}
+    <div className="min-h-screen bg-[#0F172A] flex flex-col">
+      {/* Offline banner */}
       {activeTrip && !isOnline && (
-        <div className="bg-red-600 text-white text-center text-sm font-semibold px-4 py-3 safe-top flex items-center justify-center gap-2">
-          <WifiOff className="h-4 w-4" /> No connection — GPS queued
+        <div className="bg-red-500/20 border-b border-red-500/30 text-red-300 text-xs text-center py-2 safe-top flex items-center justify-center gap-2">
+          <WifiOff className="h-3.5 w-3.5" /> Offline — queuing GPS
           {queueSize > 0 && <span className="opacity-80">({queueSize} point{queueSize !== 1 ? "s" : ""})</span>}
         </div>
       )}
-      {flushProgress && <div className="bg-green-600 text-white text-center text-sm font-semibold px-4 py-3">{flushProgress}</div>}
-      {reconnectMsg && !flushProgress && <div className="bg-green-600 text-white text-center text-sm font-semibold px-4 py-3">{reconnectMsg}</div>}
-
-      {/* LIVE TRACKING BAR (active trip only) */}
-      {activeTrip && isOnline && (
-        <div className="bg-[#16A34A] text-white text-center text-sm font-bold px-4 py-2.5 safe-top flex items-center justify-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-          </span>
-          LIVE TRACKING ACTIVE
-        </div>
-      )}
+      {flushProgress && <div className="bg-green-500/20 border-b border-green-500/30 text-green-300 text-xs text-center py-2">{flushProgress}</div>}
+      {reconnectMsg && !flushProgress && <div className="bg-green-500/20 border-b border-green-500/30 text-green-300 text-xs text-center py-2">{reconnectMsg}</div>}
 
       {/* Header */}
       <header className="flex items-center justify-between px-5 py-4 safe-top">
@@ -298,66 +320,62 @@ const DriverPage = () => {
           <img src="/metropolitan-logo.png" alt="MU" className="h-7 w-7 object-contain brightness-0 invert" />
           <span className="text-base font-bold text-white tracking-tight">MU Transport</span>
         </div>
-        <button onClick={handleLogout} className="text-white/50 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors">
-          <LogOut className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Live indicator in header */}
+          {activeTrip && isOnline && (
+            <div className="flex items-center gap-1.5 mr-1">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <span className="text-green-400 text-xs font-semibold">LIVE</span>
+            </div>
+          )}
+          <button onClick={handleLogout} className="text-white/50 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors">
+            <LogOut className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
-      <main className="flex-1 flex flex-col px-5 pb-8">
+      <main className="flex-1 flex flex-col">
+        {/* ═══ BUS SELECTION SCREEN ═══ */}
         {!activeTrip && !resumeTrip && !loadingResume && (
-          <>
-            {/* Greeting */}
-            <div className="pt-4 pb-8 space-y-2">
-              <div className="flex items-center gap-2 text-white/40">
-                {greeting.icon}
-              </div>
-              <h1 className="text-3xl font-bold text-white leading-tight">
-                {greeting.text},<br />
-                <span className="text-primary">{displayName}</span>
-              </h1>
-              <p className="text-white/40 text-sm">Ready to start your trip?</p>
-              <div className="flex items-center gap-3 text-white/50 text-sm pt-1">
-                <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {timeStr}</span>
-                <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {dateStr}</span>
-              </div>
+          <div className="flex-1 flex flex-col">
+            {/* Dark greeting area */}
+            <div className="px-6 pt-6 pb-10 text-center space-y-3">
+              <greeting.Icon className="h-12 w-12 text-white/20 mx-auto" />
+              <p className="text-lg text-white/60">{greeting.text}</p>
+              <h1 className="text-3xl font-bold text-white">{displayName}</h1>
+              <p className="text-sm text-white/40">{dateStr} · {timeStr}</p>
             </div>
 
-            {/* Main Card */}
-            <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-[440px] mx-auto space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Bus className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-[#1A1A2E] tracking-tight">Start Your Trip</h2>
-                  <p className="text-xs text-[#78716C]">Select your bus and route to begin GPS broadcasting</p>
-                </div>
-              </div>
+            {/* White bottom card */}
+            <div className="flex-1 bg-white rounded-t-3xl px-6 pt-8 pb-8 space-y-6">
+              <h2 className="text-lg font-bold text-gray-900">Start Your Trip</h2>
 
-              {/* GPS Error */}
               {gpsError && !gpsDenied && (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 font-medium">{gpsError}</div>
               )}
               {queueTrimmed && (
                 <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-700 font-medium flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0" /> Extended offline period detected. Some GPS history may be incomplete.
+                  <AlertTriangle className="h-4 w-4 shrink-0" /> Extended offline period detected.
                 </div>
               )}
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C]">Select Your Bus</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">Select Your Bus</label>
                 <Select value={selectedBus} onValueChange={setSelectedBus}>
-                  <SelectTrigger className="h-14 rounded-xl bg-[#F8F8F8] border-[#E5E5E5] text-[#1A1A2E] text-sm font-medium focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <SelectTrigger className="h-14 rounded-2xl bg-gray-50 border-2 border-gray-100 text-gray-900 text-sm font-medium focus:ring-0 focus:border-[#CC1B1B]">
                     <SelectValue placeholder="Choose a bus…" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white z-50 rounded-xl border border-[#E5E5E5] shadow-lg">
+                  <SelectContent className="bg-white z-50 rounded-xl border border-gray-200 shadow-lg">
                     {buses.length === 0 && <SelectItem value="__none" disabled>No buses assigned</SelectItem>}
                     {buses.map((b) => (
                       <SelectItem key={b.id} value={b.id} className="py-3 text-sm">
                         <span className="flex items-center gap-2">
-                          <Bus className="h-4 w-4 text-[#78716C]" />
+                          <Bus className="h-4 w-4 text-gray-400" />
                           <span className="font-medium">{b.name}</span>
-                          {b.license_plate && <span className="text-[#A8A29E] text-xs">({b.license_plate})</span>}
+                          {b.license_plate && <span className="text-gray-400 text-xs">({b.license_plate})</span>}
                         </span>
                       </SelectItem>
                     ))}
@@ -366,17 +384,17 @@ const DriverPage = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C]">Select Route</label>
+                <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">Select Route</label>
                 <Select value={selectedRoute} onValueChange={setSelectedRoute}>
-                  <SelectTrigger className="h-14 rounded-xl bg-[#F8F8F8] border-[#E5E5E5] text-[#1A1A2E] text-sm font-medium focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <SelectTrigger className="h-14 rounded-2xl bg-gray-50 border-2 border-gray-100 text-gray-900 text-sm font-medium focus:ring-0 focus:border-[#CC1B1B]">
                     <SelectValue placeholder="Choose a route…" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white z-50 rounded-xl border border-[#E5E5E5] shadow-lg">
+                  <SelectContent className="bg-white z-50 rounded-xl border border-gray-200 shadow-lg">
                     {routes.length === 0 && <SelectItem value="__none" disabled>No routes available</SelectItem>}
                     {routes.map((r) => (
                       <SelectItem key={r.id} value={r.id} className="py-3 text-sm">
                         <span className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-[#78716C]" />
+                          <MapPin className="h-4 w-4 text-gray-400" />
                           <span className="font-medium">{r.name}</span>
                         </span>
                       </SelectItem>
@@ -387,17 +405,15 @@ const DriverPage = () => {
 
               {/* Trip Preview */}
               {selectedBus && selectedRoute && selectedBusObj && selectedRouteObj && (
-                <div className="rounded-xl bg-[#F8F8F8] border border-[#E5E5E5] p-4 space-y-1.5 animate-fade-in">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#78716C]">Trip Preview</p>
-                  <p className="text-sm text-[#1A1A2E] font-medium flex items-center gap-1.5"><Bus className="h-3.5 w-3.5 text-primary" /> {selectedBusObj.name}</p>
-                  <p className="text-sm text-[#1A1A2E] font-medium flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-primary" /> {selectedRouteObj.name}</p>
-                  <p className="text-sm text-[#78716C] flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {dateStr}</p>
-                  <p className="text-sm text-[#78716C] flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Starting now</p>
+                <div className="rounded-2xl bg-gray-50 border-2 border-gray-100 p-4 space-y-1.5 animate-fade-in">
+                  <p className="text-sm text-gray-900 font-medium flex items-center gap-1.5"><Bus className="h-3.5 w-3.5 text-[#CC1B1B]" /> {selectedBusObj.name}</p>
+                  <p className="text-sm text-gray-900 font-medium flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#CC1B1B]" /> {selectedRouteObj.name}</p>
+                  <p className="text-sm text-gray-500 flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> {dateStr}</p>
                 </div>
               )}
 
               <Button
-                className={`w-full h-14 rounded-xl text-base font-bold shadow-lg transition-all active:scale-[0.97] bg-primary hover:bg-[#A81515] text-white ${
+                className={`w-full h-16 rounded-2xl text-lg font-bold shadow-[0_8px_25px_rgba(204,27,27,0.4)] transition-all active:scale-[0.97] bg-[#CC1B1B] hover:bg-[#A81515] text-white ${
                   selectedBus && selectedRoute && !starting ? "animate-pulse" : ""
                 }`}
                 disabled={!selectedBus || !selectedRoute || starting}
@@ -409,20 +425,16 @@ const DriverPage = () => {
                   <><Play className="mr-2 h-5 w-5" /> START TRIP</>
                 )}
               </Button>
-            </div>
 
-            {/* Bottom info */}
-            <div className="text-center pt-6 space-y-1">
-              <p className="text-xs text-white/30 flex items-center justify-center gap-1"><Navigation className="h-3 w-3" /> GPS will activate automatically</p>
-              <p className="text-xs text-white/30">Students will see your location live</p>
+              <p className="text-xs text-gray-400 text-center">GPS will activate automatically when trip starts</p>
             </div>
-          </>
+          </div>
         )}
 
         {/* Resume Trip Banner */}
         {!activeTrip && resumeTrip && !loadingResume && (
-          <div className="pt-8">
-            <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 space-y-4">
+          <div className="px-5 pt-8">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 space-y-4">
               <div className="flex items-center gap-2">
                 <RefreshCw className="h-5 w-5 text-white" />
                 <p className="text-base font-bold text-white">Active trip in progress</p>
@@ -432,8 +444,8 @@ const DriverPage = () => {
                 <p className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Started at {formatTime(resumeTrip.startedAt)}</p>
               </div>
               <div className="flex gap-3">
-                <Button className="flex-1 h-14 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white font-bold text-base" onClick={handleResumeTrip}>Resume Trip</Button>
-                <Button className="flex-1 h-14 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-base" disabled={ending} onClick={handleEndResumedTrip}>
+                <Button className="flex-1 h-14 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold text-base" onClick={handleResumeTrip}>Resume Trip</Button>
+                <Button className="flex-1 h-14 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-base" disabled={ending} onClick={handleEndResumedTrip}>
                   {ending ? <Loader2 className="h-5 w-5 animate-spin" /> : "End Trip"}
                 </Button>
               </div>
@@ -448,99 +460,140 @@ const DriverPage = () => {
 
         {/* ═══ ACTIVE TRIP ═══ */}
         {activeTrip && (
-          <div className="flex-1 space-y-4 pt-2">
-            {/* Trip info card */}
-            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-              {/* Card header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E5E5]">
-                <div className="flex items-center gap-2">
-                  <img src="/metropolitan-logo.png" alt="MU" className="h-5 w-5 object-contain" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#78716C]">Trip Active</span>
+          <div className="flex-1 flex flex-col px-4 pb-4">
+            {/* Main glassmorphism card */}
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 space-y-5 flex-1">
+              {/* Card top row */}
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs text-white/50 uppercase tracking-wider font-semibold">Active Trip</p>
+                  <p className="text-xl font-bold text-white">{activeTrip.busName}</p>
+                  <p className="text-sm text-white/60 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5" /> {activeTrip.routeName}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16A34A] opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#16A34A]" />
+                <div className="bg-green-500/20 border border-green-500/30 rounded-full px-3 py-1 flex items-center gap-1.5">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400" />
                   </span>
-                  <span className="text-xs font-bold text-[#16A34A]">LIVE</span>
+                  <span className="text-green-400 text-xs font-medium">Broadcasting</span>
                 </div>
               </div>
 
-              {/* Bus & Route */}
-              <div className="px-5 py-4 border-b border-[#E5E5E5] space-y-1.5">
-                <p className="text-base font-bold text-[#1A1A2E] flex items-center gap-2"><Bus className="h-4 w-4 text-primary" /> {activeTrip.busName}</p>
-                <p className="text-sm text-[#78716C] flex items-center gap-2"><MapPin className="h-4 w-4" /> {activeTrip.routeName}</p>
-              </div>
+              <div className="border-t border-white/10" />
 
-              {/* Stats */}
-              <div className="grid grid-cols-2 divide-x divide-[#E5E5E5]">
-                <div className="px-5 py-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#A8A29E]">Started</p>
-                  <p className="text-lg font-bold text-[#1A1A2E] tabular-nums">{formatTime(activeTrip.startedAt)}</p>
+              {/* Stats 2x2 grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Started */}
+                <div className="bg-white/5 rounded-2xl p-4 border border-white/10 relative">
+                  <Clock className="h-4 w-4 text-white/30 absolute top-3 right-3" />
+                  <p className="text-xs text-white/40 uppercase font-semibold tracking-wider">Started</p>
+                  <p className="text-2xl font-bold text-white mt-1 tabular-nums">{formatTime(activeTrip.startedAt)}</p>
                 </div>
-                <div className="px-5 py-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#A8A29E]">GPS Pings</p>
-                  <p className="text-lg font-bold text-[#1A1A2E] tabular-nums font-mono">{pingCount}</p>
-                  {queueSize > 0 && <p className="text-xs text-yellow-600 font-medium">+{queueSize} queued</p>}
+
+                {/* GPS Pings */}
+                <div className="bg-white/5 rounded-2xl p-4 border border-white/10 relative">
+                  <Radio className="h-4 w-4 text-green-400/40 absolute top-3 right-3" />
+                  <p className="text-xs text-white/40 uppercase font-semibold tracking-wider">GPS Pings</p>
+                  <p className="text-2xl font-bold text-green-400 mt-1 tabular-nums">{pingCount}</p>
+                  {queueSize > 0 && <p className="text-xs text-yellow-400 font-medium mt-0.5">+{queueSize} queued</p>}
                 </div>
-              </div>
-              <div className="grid grid-cols-2 divide-x divide-[#E5E5E5] border-t border-[#E5E5E5]">
-                <div className="px-5 py-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#A8A29E]">Duration</p>
-                  <p className="text-lg font-bold text-[#1A1A2E] tabular-nums font-mono">{duration}</p>
+
+                {/* Duration */}
+                <div className="bg-white/5 rounded-2xl p-4 border border-white/10 relative">
+                  <Timer className="h-4 w-4 text-white/30 absolute top-3 right-3" />
+                  <p className="text-xs text-white/40 uppercase font-semibold tracking-wider">Duration</p>
+                  <p className="text-2xl font-bold text-white mt-1 font-mono tabular-nums">{duration}</p>
                 </div>
-                <div className="px-5 py-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#A8A29E]">Status</p>
-                  <p className="text-sm font-bold text-[#16A34A] flex items-center gap-1">
-                    <Navigation className="h-3.5 w-3.5" /> Broadcasting
+
+                {/* GPS Status */}
+                <div className="bg-white/5 rounded-2xl p-4 border border-white/10 relative">
+                  <Navigation className={`h-4 w-4 absolute top-3 right-3 ${pingCount >= 3 ? 'text-green-400/40' : 'text-white/30'}`} />
+                  <p className="text-xs text-white/40 uppercase font-semibold tracking-wider">GPS Status</p>
+                  <p className={`text-sm font-semibold mt-1 ${pingCount >= 3 ? 'text-green-400' : pingCount > 0 ? 'text-amber-400' : 'text-white/50'}`}>
+                    {gpsQ.label}
                   </p>
                 </div>
               </div>
+
+              {/* GPS Quality bar */}
+              <div className="space-y-1.5">
+                <p className="text-xs text-white/40 uppercase font-semibold tracking-wider">GPS Quality</p>
+                <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${gpsQ.color}`}
+                    style={{ width: `${gpsQ.percent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Delay banner */}
+              {delayReason && (
+                <div className="rounded-2xl bg-yellow-500/10 border border-yellow-500/20 px-4 py-3 flex items-center justify-between">
+                  <p className="text-sm text-yellow-400 font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> {delayReason}</p>
+                  <button onClick={handleResolveDelay} className="text-xs font-bold text-green-400 hover:underline ml-2 shrink-0 flex items-center gap-1 min-h-[44px]">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Resolved
+                  </button>
+                </div>
+              )}
+
+              {/* Battery tier */}
+              {batInfo && (
+                <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold flex items-center gap-2.5 ${batInfo.color}`}>
+                  {batInfo.icon} {batInfo.text}
+                </div>
+              )}
+
+              {/* GPS Error */}
+              {gpsError && !gpsDenied && (
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-semibold">{gpsError}</div>
+              )}
+              {queueTrimmed && (
+                <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400 font-semibold flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" /> Extended offline period. Some GPS history may be incomplete.
+                </div>
+              )}
             </div>
 
-            {/* Delay banner */}
-            {delayReason && (
-              <div className="rounded-2xl bg-yellow-500/10 border border-yellow-500/20 px-5 py-4 flex items-center justify-between">
-                <p className="text-sm text-yellow-400 font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> {delayReason}</p>
-                <button onClick={handleResolveDelay} className="text-xs font-bold text-green-400 hover:underline ml-2 shrink-0 flex items-center gap-1 min-h-[44px]">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Resolved
-                </button>
-              </div>
-            )}
-
-            {/* Battery tier */}
-            {batInfo && (
-              <div className={`rounded-2xl border px-5 py-3.5 text-sm font-semibold flex items-center gap-2.5 ${batInfo.color}`}>
-                {batInfo.icon} {batInfo.text}
-              </div>
-            )}
-
-            {/* GPS Error */}
-            {gpsError && !gpsDenied && (
-              <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-3.5 text-sm text-red-400 font-semibold">{gpsError}</div>
-            )}
-            {queueTrimmed && (
-              <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 px-5 py-3.5 text-sm text-yellow-400 font-semibold flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0" /> Extended offline period. Some GPS history may be incomplete.
-              </div>
-            )}
-
-            {/* Action buttons */}
-            <div className="space-y-3 pt-2">
+            {/* Bottom action buttons */}
+            <div className="pt-4 space-y-3" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+              {/* Report delay button */}
               <button
                 onClick={() => setSheetOpen(true)}
-                className="w-full h-14 rounded-xl bg-[#D97706] hover:bg-[#B45309] text-white text-base font-bold shadow-lg transition-all active:scale-[0.97] flex items-center justify-center gap-2 min-h-[52px]"
+                className="w-full h-14 rounded-2xl bg-[#D97706] text-white font-semibold shadow-[0_4px_15px_rgba(217,119,6,0.4)] transition-all active:scale-[0.98] active:brightness-110 flex items-center justify-between px-5 min-h-[56px]"
               >
-                <AlertOctagon className="h-5 w-5" />
-                {delayReason ? "UPDATE REPORT" : "REPORT DELAY"}
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span>{delayReason ? "Update Report" : "Report Delay"}</span>
+                </div>
+                <ChevronRight className="h-5 w-5 text-white/60" />
               </button>
 
+              {/* Hold-to-end trip button */}
               <button
-                onClick={handleEndTrip}
+                onPointerDown={startHold}
+                onPointerUp={cancelHold}
+                onPointerLeave={cancelHold}
+                onContextMenu={(e) => e.preventDefault()}
                 disabled={ending}
-                className="w-full h-14 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-base font-bold shadow-lg transition-all active:scale-[0.97] flex items-center justify-center gap-2 min-h-[52px] disabled:opacity-50"
+                className="w-full h-14 rounded-2xl border-2 border-red-500/40 text-red-300 font-semibold transition-all flex items-center justify-center gap-2 min-h-[56px] relative overflow-hidden disabled:opacity-50"
               >
-                {ending ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Square className="h-5 w-5" /> END TRIP</>}
+                {/* Hold progress fill */}
+                <div
+                  className="absolute inset-0 bg-red-600/30 transition-none"
+                  style={{ width: `${holdProgress * 100}%` }}
+                />
+                <span className="relative flex items-center gap-2">
+                  {ending ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Square className="h-5 w-5" />
+                      {holdProgress > 0 ? "Hold to end trip…" : "End Trip"}
+                    </>
+                  )}
+                </span>
               </button>
             </div>
           </div>
