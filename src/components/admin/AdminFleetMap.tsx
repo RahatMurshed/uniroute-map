@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "@/styles/leaflet-custom.css";
-import { TILE_URL, TILE_URL_FALLBACK, TILE_ATTRIBUTION, TILE_ATTRIBUTION_FALLBACK, DEFAULT_CENTER, MU_RED, MU_AMBER, MU_GREY } from "@/lib/mapConfig";
+import { TILE_URL, TILE_ATTRIBUTION, DEFAULT_CENTER, MU_RED, MU_AMBER, MU_GREY } from "@/lib/mapConfig";
 import type { AdminBus } from "@/hooks/useAdminData";
 
 function getBusColor(bus: AdminBus): string {
@@ -46,11 +46,7 @@ export default function AdminFleetMap({ buses, centerOnBusId, onCenterDone }: Ad
       scrollWheelZoom: true,
       doubleClickZoom: true,
     });
-    const stadia = L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION });
-    const fallback = L.tileLayer(TILE_URL_FALLBACK, { attribution: TILE_ATTRIBUTION_FALLBACK });
-    let usedFallback = false;
-    stadia.on("tileerror", () => { if (!usedFallback) { usedFallback = true; map.removeLayer(stadia); fallback.addTo(map); } });
-    stadia.addTo(map);
+    L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION }).addTo(map);
     L.control.zoom({ position: "bottomright" }).addTo(map);
     L.control.scale({ position: "bottomleft", imperial: false }).addTo(map);
     mapRef.current = map;
