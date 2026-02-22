@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Download } from "lucide-react";
+import { CalendarIcon, Download, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -43,7 +43,9 @@ export default function ReportsView() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h2 className="text-xl font-bold tracking-tight text-foreground">📊 Trip Reports</h2>
+        <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-muted-foreground" /> Trip Reports
+        </h2>
         <Button onClick={exportCsv} variant="outline" size="sm" disabled={trips.length === 0} className="rounded-xl gap-1.5">
           <Download className="h-4 w-4" />
           Export CSV

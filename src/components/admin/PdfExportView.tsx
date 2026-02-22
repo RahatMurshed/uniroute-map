@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Download, Eye, Zap } from "lucide-react";
+import { CalendarIcon, Download, Eye, Zap, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,14 +25,12 @@ export default function PdfExportView() {
   const [footerNote, setFooterNote] = useState("For queries contact transport office");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Select all routes by default once loaded
   useEffect(() => {
     if (routes.length > 0 && selectedRouteIds.length === 0) {
       setSelectedRouteIds(routes.map((r) => r.id));
     }
   }, [routes]);
 
-  // Re-fetch data when date changes
   useEffect(() => {
     fetchData(date);
   }, [date, fetchData]);
@@ -77,7 +75,7 @@ export default function PdfExportView() {
       return;
     }
     downloadPdf(options);
-    toast.success("📄 PDF downloaded successfully");
+    toast.success("PDF downloaded successfully");
   };
 
   const handleQuickExport = () => {
@@ -92,7 +90,7 @@ export default function PdfExportView() {
       footerNote: "For queries contact transport office",
     };
     downloadPdf(quickOptions);
-    toast.success("📄 Quick export downloaded");
+    toast.success("Quick export downloaded");
   };
 
   if (loading && routes.length === 0) {
@@ -113,10 +111,11 @@ export default function PdfExportView() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">📄 PDF Schedule Export</h2>
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <FileDown className="h-6 w-6 text-muted-foreground" /> PDF Schedule Export
+          </h2>
           <p className="text-sm text-muted-foreground mt-1">
             Generate printable bus schedules for notice boards and handouts
           </p>
@@ -134,54 +133,34 @@ export default function PdfExportView() {
             <CardTitle className="text-base">Export Options</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            {/* Date */}
             <div className="space-y-2">
               <Label>Select Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn("w-full justify-start text-left font-normal")}
-                  >
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dayLabel}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(d) => d && setDate(d)}
-                    className="p-3 pointer-events-auto"
-                  />
+                  <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} className="p-3 pointer-events-auto" />
                 </PopoverContent>
               </Popover>
             </div>
 
-            {/* Routes */}
             <div className="space-y-2">
               <Label>Select Routes to Include</Label>
               <div className="flex gap-2 mb-2">
-                <Button size="sm" variant="outline" onClick={selectAll}>
-                  Select All
-                </Button>
-                <Button size="sm" variant="outline" onClick={deselectAll}>
-                  Deselect All
-                </Button>
+                <Button size="sm" variant="outline" onClick={selectAll}>Select All</Button>
+                <Button size="sm" variant="outline" onClick={deselectAll}>Deselect All</Button>
               </div>
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {routes.map((route) => (
                   <label key={route.id} className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={selectedRouteIds.includes(route.id)}
-                      onCheckedChange={() => toggleRoute(route.id)}
-                    />
+                    <Checkbox checked={selectedRouteIds.includes(route.id)} onCheckedChange={() => toggleRoute(route.id)} />
                     <span className="flex items-center gap-2 text-sm">
                       {route.colorHex && (
-                        <span
-                          className="inline-block w-3 h-3 rounded-full shrink-0"
-                          style={{ backgroundColor: route.colorHex }}
-                        />
+                        <span className="inline-block w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: route.colorHex }} />
                       )}
                       {route.name}
                     </span>
@@ -190,7 +169,6 @@ export default function PdfExportView() {
               </div>
             </div>
 
-            {/* Include sections */}
             <div className="space-y-2">
               <Label>Include Sections</Label>
               <div className="space-y-2">
@@ -208,7 +186,6 @@ export default function PdfExportView() {
               </div>
             </div>
 
-            {/* Header info */}
             <div className="space-y-2">
               <Label>University Name</Label>
               <Input value={universityName} onChange={(e) => setUniversityName(e.target.value)} />
@@ -218,15 +195,12 @@ export default function PdfExportView() {
               <Input value={footerNote} onChange={(e) => setFooterNote(e.target.value)} />
             </div>
 
-            {/* Action buttons */}
             <div className="flex gap-3 pt-2">
               <Button onClick={handlePreview} variant="outline" className="flex-1 gap-2">
-                <Eye className="h-4 w-4" />
-                Preview PDF
+                <Eye className="h-4 w-4" /> Preview PDF
               </Button>
               <Button onClick={handleDownload} className="flex-1 gap-2">
-                <Download className="h-4 w-4" />
-                Download PDF
+                <Download className="h-4 w-4" /> Download PDF
               </Button>
             </div>
           </CardContent>
@@ -239,12 +213,7 @@ export default function PdfExportView() {
           </CardHeader>
           <CardContent>
             {previewUrl ? (
-              <iframe
-                src={previewUrl}
-                className="w-full rounded-lg border border-border"
-                style={{ height: "600px" }}
-                title="PDF Preview"
-              />
+              <iframe src={previewUrl} className="w-full rounded-lg border border-border" style={{ height: "600px" }} title="PDF Preview" />
             ) : (
               <div className="flex items-center justify-center h-[600px] rounded-lg border border-dashed border-border bg-muted/20">
                 <p className="text-muted-foreground text-sm text-center px-4">

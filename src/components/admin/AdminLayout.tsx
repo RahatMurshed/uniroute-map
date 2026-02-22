@@ -1,18 +1,18 @@
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/integrations/supabase/client";
-import { Map, Route, CalendarDays, Users, BarChart3, FileText, LogOut } from "lucide-react";
+import { LayoutDashboard, Route, CalendarClock, Users, BarChart3, FileDown, LogOut, Bus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export type AdminView = "fleet" | "routes" | "overrides" | "drivers" | "reports" | "export";
 
-const navItems: { id: AdminView; label: string; icon: React.ReactNode; emoji: string }[] = [
-  { id: "fleet", label: "Fleet Overview", icon: <Map className="h-5 w-5" />, emoji: "🗺️" },
-  { id: "routes", label: "Route Manager", icon: <Route className="h-5 w-5" />, emoji: "🛤️" },
-  { id: "overrides", label: "Overrides", icon: <CalendarDays className="h-5 w-5" />, emoji: "📅" },
-  { id: "drivers", label: "Drivers", icon: <Users className="h-5 w-5" />, emoji: "👤" },
-  { id: "reports", label: "Reports", icon: <BarChart3 className="h-5 w-5" />, emoji: "📊" },
-  { id: "export", label: "PDF Export", icon: <FileText className="h-5 w-5" />, emoji: "📄" },
+const navItems: { id: AdminView; label: string; icon: React.ReactNode }[] = [
+  { id: "fleet", label: "Fleet Overview", icon: <LayoutDashboard className="h-5 w-5" /> },
+  { id: "routes", label: "Route Manager", icon: <Route className="h-5 w-5" /> },
+  { id: "overrides", label: "Overrides", icon: <CalendarClock className="h-5 w-5" /> },
+  { id: "drivers", label: "Drivers", icon: <Users className="h-5 w-5" /> },
+  { id: "reports", label: "Reports", icon: <BarChart3 className="h-5 w-5" /> },
+  { id: "export", label: "PDF Export", icon: <FileDown className="h-5 w-5" /> },
 ];
 
 interface AdminLayoutProps {
@@ -52,10 +52,10 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
       <aside className="hidden md:flex md:w-64 flex-col bg-sidebar shrink-0">
         <div className="p-5 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🚌</span>
+            <Bus className="h-6 w-6 text-sidebar-primary" />
             <h1 className="text-lg font-extrabold tracking-tight text-sidebar-foreground">UniRoute</h1>
           </div>
-          <p className="text-xs text-sidebar-foreground/50 mt-0.5 ml-9">Admin Dashboard</p>
+          <p className="text-xs text-sidebar-foreground/50 mt-0.5 ml-8">Admin Dashboard</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => (
@@ -68,7 +68,7 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }`}
             >
-              <span className="text-base">{item.emoji}</span>
+              {item.icon}
               {item.label}
             </button>
           ))}
@@ -99,10 +99,10 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
         {/* Header */}
         <header className="shrink-0 h-14 flex items-center justify-between px-5 border-b border-border bg-card shadow-sm">
           <h2 className="text-base font-bold tracking-tight text-card-foreground md:hidden flex items-center gap-2">
-            <span>🚌</span> UniRoute
+            <Bus className="h-5 w-5 text-primary" /> UniRoute
           </h2>
           <h2 className="text-base font-bold tracking-tight text-card-foreground hidden md:flex items-center gap-2">
-            <span>{navItems.find((n) => n.id === activeView)?.emoji}</span>
+            {navItems.find((n) => n.id === activeView)?.icon}
             {navItems.find((n) => n.id === activeView)?.label}
           </h2>
           <div className="flex items-center gap-4">
@@ -129,7 +129,7 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
               <div className={`px-3 py-0.5 rounded-full transition-colors ${
                 activeView === item.id ? "bg-primary/10" : ""
               }`}>
-                <span className="text-lg">{item.emoji}</span>
+                {item.icon}
               </div>
               <span className="truncate max-w-[60px]">{item.label.split(" ")[0]}</span>
             </button>
@@ -138,7 +138,7 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
             onClick={handleLogout}
             className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-semibold text-muted-foreground min-h-[52px]"
           >
-            <span className="text-lg">🚪</span>
+            <LogOut className="h-5 w-5" />
             <span>Logout</span>
           </button>
         </nav>

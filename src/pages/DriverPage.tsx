@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, LogOut } from "lucide-react";
+import { Loader2, LogOut, Bus, MapPin, Play, Square, AlertOctagon, Radio, Navigation, Sunrise, Sun, Moon, RefreshCw, AlertTriangle, WifiOff, CheckCircle2, Battery, BatteryLow, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGpsBroadcast, type BatteryTier } from "@/hooks/useGpsBroadcast";
 import { ReportDelaySheet, ISSUE_OPTIONS, type IssueKey } from "@/components/ReportDelaySheet";
@@ -30,16 +30,16 @@ interface ActiveTrip {
 
 const getGreeting = () => {
   const h = new Date().getHours();
-  if (h < 12) return { text: "Good morning", emoji: "🌅" };
-  if (h < 17) return { text: "Good afternoon", emoji: "☀️" };
-  return { text: "Good evening", emoji: "🌙" };
+  if (h < 12) return { text: "Good morning", icon: <Sunrise className="h-5 w-5 text-warning" /> };
+  if (h < 17) return { text: "Good afternoon", icon: <Sun className="h-5 w-5 text-warning" /> };
+  return { text: "Good evening", icon: <Moon className="h-5 w-5 text-muted-foreground" /> };
 };
 
-const batteryLabel = (tier: BatteryTier): { text: string; color: string } | null => {
+const batteryLabel = (tier: BatteryTier): { text: string; color: string; icon: React.ReactNode } | null => {
   switch (tier) {
-    case "reduced": return { text: "🔋 Reduced GPS (battery saving)", color: "bg-warning/10 border-warning/30 text-warning" };
-    case "minimal": return { text: "🔋 Minimal GPS (low battery ⚠️)", color: "bg-destructive/10 border-destructive/30 text-destructive" };
-    case "charging": return { text: "⚡ Charging — Full GPS active", color: "bg-success/10 border-success/30 text-success" };
+    case "reduced": return { text: "Reduced GPS (battery saving)", color: "bg-warning/10 border-warning/30 text-warning", icon: <BatteryLow className="h-4 w-4" /> };
+    case "minimal": return { text: "Minimal GPS (low battery)", color: "bg-destructive/10 border-destructive/30 text-destructive", icon: <Battery className="h-4 w-4" /> };
+    case "charging": return { text: "Charging — Full GPS active", color: "bg-success/10 border-success/30 text-success", icon: <Zap className="h-4 w-4" /> };
     default: return null;
   }
 };
@@ -338,7 +338,7 @@ const DriverPage = () => {
       <div className="min-h-screen bg-background flex items-center justify-center px-6 safe-top safe-bottom">
         <div className="max-w-sm w-full text-center space-y-6">
           <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-4xl">📍</span>
+            <MapPin className="h-10 w-10 text-primary" />
           </div>
           <h2 className="text-xl font-bold tracking-tight text-foreground">Location Required</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
@@ -370,7 +370,7 @@ const DriverPage = () => {
       {/* Offline / Online banner */}
       {activeTrip && !isOnline && (
         <div className="bg-destructive text-destructive-foreground text-center text-sm font-medium px-4 py-2.5 safe-top">
-          📡 No Connection — GPS points queued locally
+          <WifiOff className="h-4 w-4 inline mr-1" /> No Connection — GPS points queued locally
           {queueSize > 0 && <span className="ml-2 opacity-80">⏳ {queueSize} point{queueSize !== 1 ? "s" : ""} queued</span>}
         </div>
       )}
@@ -388,7 +388,7 @@ const DriverPage = () => {
       {/* Header */}
       <header className="flex items-center justify-between border-b border-border bg-card px-5 py-3.5 shadow-sm safe-top">
         <div className="flex items-center gap-2">
-          <span className="text-xl">🚌</span>
+          <Bus className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-bold tracking-tight text-foreground">UniRoute</h1>
         </div>
         <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground gap-1.5">
@@ -400,8 +400,8 @@ const DriverPage = () => {
       <main className="flex-1 mx-auto w-full max-w-md px-5 py-6 space-y-5">
         {/* Greeting */}
         <div className="space-y-0.5">
-          <p className="text-lg text-foreground">
-            {greeting.emoji} {greeting.text}, <span className="font-bold">{displayName}</span>
+          <p className="text-lg text-foreground flex items-center gap-2">
+            {greeting.icon} {greeting.text}, <span className="font-bold">{displayName}</span>
           </p>
           {!activeTrip && !resumeTrip && !loadingResume && (
             <p className="text-sm text-muted-foreground">Ready to start your trip?</p>
@@ -418,7 +418,7 @@ const DriverPage = () => {
         {/* Queue trimmed warning */}
         {queueTrimmed && (
           <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning font-medium">
-            ⚠️ Extended offline period detected. Some GPS history may be incomplete.
+            <AlertTriangle className="h-4 w-4 inline mr-1" /> Extended offline period detected. Some GPS history may be incomplete.
           </div>
         )}
 
@@ -426,7 +426,7 @@ const DriverPage = () => {
         {!activeTrip && resumeTrip && (
           <div className="rounded-xl border border-secondary/30 bg-secondary/10 p-5 space-y-3 shadow-sm">
             <div className="flex items-center gap-2">
-              <span className="text-xl">🔄</span>
+              <RefreshCw className="h-5 w-5" />
               <p className="text-sm font-bold text-foreground">Active trip in progress</p>
             </div>
             <div className="space-y-1 text-sm text-muted-foreground">
@@ -531,20 +531,17 @@ const DriverPage = () => {
             {/* Delay banner */}
             {delayReason && (
               <div className="rounded-xl bg-warning/10 border border-warning/30 px-4 py-3 flex items-center justify-between">
-                <p className="text-sm text-warning font-medium">⚠️ {delayReason}</p>
-                <button
-                  onClick={handleResolveDelay}
-                  className="text-xs font-semibold text-success hover:underline ml-2 shrink-0"
-                >
-                  ✅ Resolved
+                <p className="text-sm text-warning font-medium flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> {delayReason}</p>
+                <button onClick={handleResolveDelay} className="text-xs font-semibold text-success hover:underline ml-2 shrink-0 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Resolved
                 </button>
               </div>
             )}
 
             {/* Battery tier indicator */}
             {batInfo && (
-              <div className={`rounded-xl border px-4 py-2.5 text-sm font-medium ${batInfo.color}`}>
-                {batInfo.text}
+              <div className={`rounded-xl border px-4 py-2.5 text-sm font-medium flex items-center gap-2 ${batInfo.color}`}>
+                {batInfo.icon} {batInfo.text}
               </div>
             )}
 
@@ -589,7 +586,7 @@ const DriverPage = () => {
                 className="w-full h-14 rounded-xl bg-warning hover:bg-warning/90 text-warning-foreground text-lg font-bold shadow-md transition-all active:scale-[0.98]"
                 onClick={() => setSheetOpen(true)}
               >
-                {delayReason ? "📝 UPDATE REPORT" : "⚠️ REPORT DELAY"}
+                {delayReason ? <><AlertOctagon className="mr-2 h-5 w-5" /> UPDATE REPORT</> : <><AlertOctagon className="mr-2 h-5 w-5" /> REPORT DELAY</>}
               </Button>
             </div>
           </div>

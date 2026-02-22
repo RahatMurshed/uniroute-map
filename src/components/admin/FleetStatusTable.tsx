@@ -1,21 +1,22 @@
+import { Circle } from "lucide-react";
 import type { AdminBus } from "@/hooks/useAdminData";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 function getStatusBadge(bus: AdminBus) {
   if (!bus.tripStatus) {
-    return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">⚫ Inactive</span>;
+    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground"><Circle className="h-2 w-2 fill-muted-foreground" /> Inactive</span>;
   }
   if (bus.tripStatus === "delayed") {
-    return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-warning/10 text-warning border border-warning/20">🟡 Delayed</span>;
+    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-warning/10 text-warning border border-warning/20"><Circle className="h-2 w-2 fill-warning" /> Delayed</span>;
   }
   if (bus.lastPing) {
     const ageSec = (Date.now() - new Date(bus.lastPing).getTime()) / 1000;
     if (ageSec > 120) {
-      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-destructive/10 text-destructive border border-destructive/20">🔴 Offline</span>;
+      return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-destructive/10 text-destructive border border-destructive/20"><Circle className="h-2 w-2 fill-destructive" /> Offline</span>;
     }
   }
-  return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success/10 text-success border border-success/20">🟢 Active</span>;
+  return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-success/10 text-success border border-success/20"><Circle className="h-2 w-2 fill-success" /> Active</span>;
 }
 
 function timeAgo(ts: string | null): string {

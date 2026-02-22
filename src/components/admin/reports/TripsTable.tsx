@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format, differenceInMinutes } from "date-fns";
-import { Eye } from "lucide-react";
+import { Eye, Circle, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,11 +12,11 @@ interface Props {
   onViewDetail: (tripId: string) => void;
 }
 
-const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  completed: { label: "🟢 Completed", variant: "secondary" },
-  delayed: { label: "🟡 Delayed", variant: "outline" },
-  cancelled: { label: "❌ Cancelled", variant: "destructive" },
-  active: { label: "🔵 Active", variant: "default" },
+const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; iconClass: string }> = {
+  completed: { label: "Completed", variant: "secondary", iconClass: "fill-success text-success" },
+  delayed: { label: "Delayed", variant: "outline", iconClass: "fill-warning text-warning" },
+  cancelled: { label: "Cancelled", variant: "destructive", iconClass: "fill-destructive text-destructive" },
+  active: { label: "Active", variant: "default", iconClass: "fill-info text-info" },
 };
 
 type SortKey = "date" | "bus" | "driver" | "route" | "status" | "gps";
@@ -53,7 +53,8 @@ export default function TripsTable({ trips, computeGpsPct, onViewDetail }: Props
   if (trips.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-40 rounded-xl border border-border bg-muted/30 text-center">
-        <p className="text-lg text-muted-foreground">📊 No trips found for the selected period</p>
+        <BarChart3 className="h-8 w-8 text-muted-foreground/40 mb-2" />
+        <p className="text-lg text-muted-foreground">No trips found for the selected period</p>
         <p className="text-sm text-muted-foreground mt-1">Try selecting a wider date range.</p>
       </div>
     );
@@ -96,7 +97,12 @@ export default function TripsTable({ trips, computeGpsPct, onViewDetail }: Props
                 <TableCell className="whitespace-nowrap">{t.started_at ? format(new Date(t.started_at), "hh:mm a") : "—"}</TableCell>
                 <TableCell className="whitespace-nowrap">{t.ended_at ? format(new Date(t.ended_at), "hh:mm a") : "Active"}</TableCell>
                 <TableCell>{dur}</TableCell>
-                <TableCell><Badge variant={badge.variant}>{badge.label}</Badge></TableCell>
+                <TableCell>
+                  <Badge variant={badge.variant} className="gap-1">
+                    <Circle className={`h-2 w-2 ${badge.iconClass}`} />
+                    {badge.label}
+                  </Badge>
+                </TableCell>
                 <TableCell>{t.gps_pings}</TableCell>
                 <TableCell>{gpsPct}%</TableCell>
                 <TableCell>

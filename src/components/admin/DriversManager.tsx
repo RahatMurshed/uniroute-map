@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDriverManager, type DriverRecord } from "@/hooks/useDriverManager";
@@ -62,7 +62,7 @@ export default function DriversManager() {
         </div>
       ) : drivers.length === 0 ? (
         <div className="text-center py-16 bg-card rounded-xl border border-border shadow-sm">
-          <span className="text-4xl">👤</span>
+          <User className="h-10 w-10 text-muted-foreground/40 mx-auto" />
           <p className="text-base font-semibold text-foreground mt-3">No drivers added yet</p>
           <p className="text-sm text-muted-foreground mt-1">Click "+ Add Driver" to create driver accounts.</p>
         </div>

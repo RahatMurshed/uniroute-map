@@ -1,3 +1,4 @@
+import { BarChart3, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface Props {
@@ -13,10 +14,10 @@ interface Props {
 }
 
 const cards = [
-  { key: "total", label: "Total Trips", emoji: "📊", pctKey: null },
-  { key: "onTime", label: "On Time Trips", emoji: "✅", pctKey: "onTimePct" },
-  { key: "delayed", label: "Delayed Trips", emoji: "⚠️", pctKey: "delayedPct" },
-  { key: "cancelled", label: "Cancelled Trips", emoji: "❌", pctKey: "cancelledPct" },
+  { key: "total", label: "Total Trips", icon: <BarChart3 className="h-5 w-5 text-secondary" />, pctKey: null },
+  { key: "onTime", label: "On Time Trips", icon: <CheckCircle2 className="h-5 w-5 text-success" />, pctKey: "onTimePct" },
+  { key: "delayed", label: "Delayed Trips", icon: <AlertTriangle className="h-5 w-5 text-warning" />, pctKey: "delayedPct" },
+  { key: "cancelled", label: "Cancelled Trips", icon: <XCircle className="h-5 w-5 text-destructive" />, pctKey: "cancelledPct" },
 ] as const;
 
 export default function ReportsSummary({ stats }: Props) {
@@ -26,7 +27,7 @@ export default function ReportsSummary({ stats }: Props) {
         <Card key={c.key}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-2xl">{c.emoji}</span>
+              {c.icon}
               <span className="text-sm font-medium text-muted-foreground">{c.label}</span>
             </div>
             <p className="text-3xl font-bold text-foreground">{stats[c.key]}</p>

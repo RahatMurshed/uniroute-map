@@ -8,7 +8,8 @@ import ScheduleView from "@/components/ScheduleView";
 import NotificationSheet from "@/components/NotificationSheet";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
-
+import { Bus, Star, MapPin, Bell, BellRing, BellOff, Map as MapIcon, ClipboardList, Clock, AlertTriangle, X } from "lucide-react";
+import { renderToStaticMarkup } from "react-dom/server";
 const DEFAULT_CENTER: L.LatLngTuple = [23.8103, 90.4125];
 const DEFAULT_ZOOM = 15;
 
@@ -73,7 +74,7 @@ function makeBusIcon(color: string, stale?: boolean) {
     iconSize: [40, 40],
     iconAnchor: [20, 20],
     popupAnchor: [0, -22],
-    html: `<div style="width:40px;height:40px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 3px 12px rgba(0,0,0,.25);border:3px solid white;opacity:${opacity};transition:all .6s ease;">🚌</div>`,
+    html: `<div style="width:40px;height:40px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.25);border:3px solid white;opacity:${opacity};transition:all .6s ease;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></svg></div>`,
   });
 }
 
@@ -84,7 +85,7 @@ function makeStopIcon(isFavourite: boolean) {
       iconSize: [28, 28],
       iconAnchor: [14, 14],
       popupAnchor: [0, -16],
-      html: `<div style="width:28px;height:28px;border-radius:50%;background:hsl(45,93%,47%);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:14px;">⭐</div>`,
+      html: `<div style="width:28px;height:28px;border-radius:50%;background:hsl(45,93%,47%);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>`,
     });
   }
   return L.divIcon({
@@ -324,7 +325,7 @@ const MapPage = () => {
           {/* ── Top bar ── */}
           <div className="fixed top-0 left-0 right-0 z-[1000] flex items-center justify-between px-4 py-3 pointer-events-none safe-top">
             <div className="pointer-events-auto rounded-2xl bg-card/80 backdrop-blur-xl shadow-md border border-border/50 px-4 py-2.5">
-              <span className="text-lg font-extrabold tracking-tight text-foreground">UniRoute 🚌</span>
+              <span className="text-lg font-extrabold tracking-tight text-foreground flex items-center gap-1.5"><Bus className="h-5 w-5 text-primary" /> UniRoute</span>
             </div>
 
             <div className="flex items-center gap-2 pointer-events-auto">
@@ -333,7 +334,11 @@ const MapPage = () => {
                   ? "bg-success/90 text-success-foreground border-success/50"
                   : "bg-destructive/90 text-destructive-foreground border-destructive/50"
               }`}>
-                {connected ? "🟢 Live" : "🔴 Reconnecting..."}
+                {connected ? (
+                  <><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span></span> Live</>
+                ) : (
+                  <><span className="relative flex h-2 w-2"><span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span></span> Reconnecting...</>
+                )}
               </div>
 
               <select
@@ -370,7 +375,7 @@ const MapPage = () => {
                 }`}
                 aria-label="Notifications"
               >
-                {push.permission === "denied" ? "🔕" : "🔔"}
+                {push.permission === "denied" ? <BellOff className="h-5 w-5" /> : push.subscribed ? <BellRing className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
               </button>
             </div>
           </div>
@@ -378,20 +383,20 @@ const MapPage = () => {
           {/* ── Favourite banner ── */}
           {showFavBanner && favouriteStop && (
             <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[1000] rounded-2xl bg-card/90 backdrop-blur-xl shadow-md border border-border/50 px-4 py-2.5 flex items-center gap-2 max-w-xs pointer-events-auto mt-2">
-              <p className="text-sm text-foreground">
-                📍 Showing: <strong>{favouriteStop.stop_name}</strong>
+              <p className="text-sm text-foreground flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-primary" /> Showing: <strong>{favouriteStop.stop_name}</strong>
               </p>
               <button
                 onClick={() => setShowFavBanner(false)}
                 className="text-muted-foreground hover:text-foreground ml-1 p-1 min-w-[28px] min-h-[28px] flex items-center justify-center"
-              >✕</button>
+              ><X className="h-4 w-4" /></button>
             </div>
           )}
 
           {/* ── No active buses banner ── */}
           {buses.length === 0 && !showFavBanner && (
             <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[1000] rounded-2xl bg-card/90 backdrop-blur-xl shadow-md border border-border/50 px-5 py-4 text-center max-w-xs pointer-events-auto mt-2">
-              <p className="text-sm font-semibold text-foreground">🕐 No buses currently active</p>
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5"><Clock className="h-4 w-4" /> No buses currently active</p>
               <p className="text-xs text-muted-foreground mt-1">Service hours: 7:00 AM – 9:00 PM</p>
               <p className="text-xs text-muted-foreground">Tap a stop for scheduled times</p>
             </div>
@@ -425,16 +430,16 @@ const MapPage = () => {
                           className="text-lg min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 transition-transform active:scale-90"
                           aria-label={favouriteStop?.stop_id === selectedStop.id ? "Remove favourite" : "Set as favourite"}
                         >
-                          {favouriteStop?.stop_id === selectedStop.id ? "⭐" : "☆"}
+                          {favouriteStop?.stop_id === selectedStop.id ? <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" /> : <Star className="h-5 w-5 text-muted-foreground" />}
                         </button>
                         <div className="min-w-0">
-                          <h3 className="font-bold text-foreground truncate text-base">📍 {selectedStop.name}</h3>
+                          <h3 className="font-bold text-foreground truncate text-base flex items-center gap-1"><MapPin className="h-4 w-4 text-primary shrink-0" /> {selectedStop.name}</h3>
                           {selectedStop.landmark && (
                             <p className="text-xs text-muted-foreground">{selectedStop.landmark}</p>
                           )}
                         </div>
                       </div>
-                      <button onClick={() => { setSelectedStop(null); setTickCounter(0); }} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 min-h-[44px] flex items-center">✕</button>
+                      <button onClick={() => { setSelectedStop(null); setTickCounter(0); }} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 min-h-[44px] flex items-center"><X className="h-4 w-4" /></button>
                     </div>
 
                     {etas.length === 0 ? (
@@ -448,12 +453,12 @@ const MapPage = () => {
                           return (
                             <div key={eta.busId} className={`rounded-xl px-3 py-2.5 ${isStale ? "bg-muted/40 border border-dashed border-muted-foreground/20" : "bg-muted/40"}`}>
                               <div className="flex items-center justify-between">
-                                <span className="text-sm font-semibold text-foreground">🚌 {eta.busName}</span>
+                                <span className="text-sm font-semibold text-foreground flex items-center gap-1"><Bus className="h-3.5 w-3.5" /> {eta.busName}</span>
                                 <span className="text-xs text-muted-foreground font-medium">{eta.routeName}</span>
                               </div>
                               {isStale ? (
                                 <>
-                                  <p className="text-sm mt-0.5 text-warning font-medium">⚠️ Bus location unavailable</p>
+                                  <p className="text-sm mt-0.5 text-warning font-medium flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Bus location unavailable</p>
                                   <p className="text-xs text-muted-foreground mt-0.5">Last seen {timeAgo(eta.timestamp)}</p>
                                 </>
                               ) : (
@@ -497,8 +502,8 @@ const MapPage = () => {
       <div className="shrink-0 bg-card/95 backdrop-blur-xl border-t border-border z-[1001] safe-bottom">
         <div className="flex max-w-md mx-auto">
           {[
-            { id: "map" as TabId, emoji: "🗺️", label: "Live Map" },
-            { id: "schedule" as TabId, emoji: "📋", label: "Schedule" },
+            { id: "map" as TabId, icon: <MapIcon className="h-5 w-5" />, label: "Live Map" },
+            { id: "schedule" as TabId, icon: <ClipboardList className="h-5 w-5" />, label: "Schedule" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -512,7 +517,7 @@ const MapPage = () => {
               <div className={`px-5 py-1 rounded-full transition-colors ${
                 activeTab === tab.id ? "bg-primary/10" : ""
               }`}>
-                <span className="text-lg">{tab.emoji}</span>
+                {tab.icon}
               </div>
               <span>{tab.label}</span>
             </button>
@@ -539,17 +544,17 @@ const MapPage = () => {
 function busPopupHtml(bus: BusLocation, stale?: boolean) {
   if (stale) {
     return `<div style="font-size:13px;min-width:160px;font-family:Inter,system-ui,sans-serif;">
-      <b>🚌 ${bus.busName}</b><br/>
-      <span style="color:#C45C00;">⚠️ Signal lost</span><br/>
+      <b>${bus.busName}</b><br/>
+      <span style="color:#D97706;">⚠ Signal lost</span><br/>
       Last seen: ${timeAgo(bus.timestamp)}<br/>
-      <span style="color:#6B6B6B;font-size:11px;">Route: ${bus.routeName}</span>
+      <span style="color:#78716C;font-size:11px;">Route: ${bus.routeName}</span>
     </div>`;
   }
   return `<div style="font-size:13px;min-width:160px;font-family:Inter,system-ui,sans-serif;">
-    <b>🚌 ${bus.busName}</b><br/>
+    <b>${bus.busName}</b><br/>
     Route: ${bus.routeName}<br/>
     Speed: ${Math.round(bus.speedKmh)} km/h<br/>
-    <span style="color:#6B6B6B;font-size:11px;">Updated: ${timeAgo(bus.timestamp)}</span>
+    <span style="color:#78716C;font-size:11px;">Updated: ${timeAgo(bus.timestamp)}</span>
   </div>`;
 }
 
