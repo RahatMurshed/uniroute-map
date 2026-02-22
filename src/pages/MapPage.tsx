@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet-polylinedecorator";
+import "@/styles/leaflet-custom.css";
+import { TILE_URL, TILE_ATTRIBUTION, MU_RED, MU_AMBER, MU_GREY } from "@/lib/mapConfig";
 import { useMapData, type BusLocation, type Stop } from "@/hooks/useMapData";
 import { calculateETAsForStop, recordPing, type BusETA } from "@/lib/eta";
 import { seedHistory } from "@/lib/etaEngine";
@@ -17,7 +20,7 @@ import { NoActiveBusesBanner } from "@/components/ServiceInfo";
 import { useOccupancy, getOccupancyPillClasses, getAnonId, hasCheckedIn, markCheckedIn, type OccupancyInfo } from "@/hooks/useOccupancy";
 
 const DEFAULT_CENTER: L.LatLngTuple = [23.8103, 90.4125];
-const DEFAULT_ZOOM = 15;
+const DEFAULT_ZOOM = 16;
 
 const FAV_STORAGE_KEY = "uniroute_favourite_stop";
 
@@ -66,13 +69,13 @@ function timeAgo(ts: string) {
 
 function makeBusIcon(color: string, stale?: boolean) {
   const opacity = stale ? "0.4" : "1";
-  const bg = stale ? "#9ca3af" : color;
+  const bg = stale ? MU_GREY : color;
   return L.divIcon({
     className: "",
     iconSize: [40, 40],
     iconAnchor: [20, 20],
-    popupAnchor: [0, -22],
-    html: `<div style="width:40px;height:40px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.25);border:3px solid white;opacity:${opacity};transition:all .6s ease;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></svg></div>`,
+    popupAnchor: [0, -24],
+    html: `<div style="width:40px;height:40px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.25);border:3px solid white;opacity:${opacity};"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></svg></div>`,
   });
 }
 
@@ -83,15 +86,15 @@ function makeStopIcon(isFavourite: boolean) {
       iconSize: [28, 28],
       iconAnchor: [14, 14],
       popupAnchor: [0, -16],
-      html: `<div style="width:28px;height:28px;border-radius:50%;background:hsl(45,93%,47%);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>`,
+      html: `<div class="stop-marker" style="width:28px;height:28px;border-radius:50%;background:${MU_RED};border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>`,
     });
   }
   return L.divIcon({
     className: "",
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
-    popupAnchor: [0, -10],
-    html: `<div style="width:14px;height:14px;border-radius:50%;background:#0A0A0F;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3);"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+    popupAnchor: [0, -8],
+    html: `<div class="stop-marker" style="width:12px;height:12px;border-radius:50%;background:white;border:2px solid ${MU_RED};box-shadow:0 1px 4px rgba(0,0,0,.2);"></div>`,
   });
 }
 
@@ -100,7 +103,7 @@ const MapPage = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const busMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   const stopMarkersRef = useRef<Map<string, L.Marker>>(new Map());
-  const polylinesRef = useRef<L.Polyline[]>([]);
+  const polylinesRef = useRef<L.Layer[]>([]);
 
   const [activeTab, setActiveTab] = useState<TabId>(getInitialTab);
   const [favouriteStop, setFavouriteStop] = useState<FavouriteStop | null>(loadFavourite);
@@ -267,10 +270,10 @@ const MapPage = () => {
   // Initialize map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = L.map(containerRef.current, { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, zoomControl: false });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    const map = L.map(containerRef.current, { center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, zoomControl: false, scrollWheelZoom: true, doubleClickZoom: true });
+    L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION }).addTo(map);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    L.control.scale({ position: "bottomleft", imperial: false }).addTo(map);
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
   }, []);
@@ -319,15 +322,24 @@ const MapPage = () => {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    polylinesRef.current.forEach((p) => p.remove());
+    polylinesRef.current.forEach((p) => map.removeLayer(p));
     polylinesRef.current = [];
     const sMap = new Map(stops.map((s) => [s.id, s]));
     for (const route of activeRoutes) {
       if (!route.stopSequence || route.stopSequence.length < 2) continue;
       const positions = route.stopSequence.map((id) => sMap.get(id)).filter(Boolean).map((s) => [s!.lat, s!.lng] as L.LatLngTuple);
       if (positions.length < 2) continue;
-      const polyline = L.polyline(positions, { color: route.colorHex, weight: 4, opacity: 0.7 }).addTo(map);
+      const polyline = L.polyline(positions, { color: route.colorHex, weight: 5, opacity: 0.8 }).addTo(map);
       polylinesRef.current.push(polyline);
+      // Arrow decorators along route
+      const decorator = (L as any).polylineDecorator(polyline, {
+        patterns: [{
+          offset: 25,
+          repeat: 200,
+          symbol: (L as any).Symbol.arrowHead({ pixelSize: 10, polygon: false, pathOptions: { stroke: true, color: route.colorHex, weight: 2, opacity: 0.7 } }),
+        }],
+      }).addTo(map);
+      polylinesRef.current.push(decorator);
     }
   }, [activeRoutes, stops]);
 
@@ -623,32 +635,35 @@ const MapPage = () => {
 };
 
 function busPopupHtml(bus: BusLocation, stale?: boolean, occ?: OccupancyInfo) {
+  const statusDot = stale ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${MU_AMBER};margin-right:4px;"></span>` : `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#16A34A;margin-right:4px;"></span>`;
+  const statusText = stale ? "Signal Lost" : "Active";
   const occHtml = occ
-    ? `<div style="margin-top:4px;">
+    ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;">
         <div style="display:flex;align-items:center;gap:4px;">
-          <div style="flex:1;height:6px;background:#e5e5e5;border-radius:3px;overflow:hidden;">
+          <div style="flex:1;height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;">
             <div style="height:100%;border-radius:3px;background:${occ.level === 'empty' ? '#16A34A' : occ.level === 'filling' ? '#EAB308' : occ.level === 'almost_full' ? '#F97316' : '#DC2626'};width:${occ.percentage}%;"></div>
           </div>
-          <span style="font-size:11px;font-weight:600;color:${occ.level === 'empty' ? '#16A34A' : occ.level === 'filling' ? '#EAB308' : occ.level === 'almost_full' ? '#F97316' : '#DC2626'}">${occ.percentage}% · ${occ.label}</span>
+          <span style="font-size:11px;font-weight:600;color:${occ.level === 'empty' ? '#16A34A' : occ.level === 'filling' ? '#EAB308' : occ.level === 'almost_full' ? '#F97316' : '#DC2626'}">${occ.percentage}%</span>
         </div>
-        ${occ.capacity ? `<span style="font-size:10px;color:#78716C;">${occ.count}/${occ.capacity} passengers</span>` : ''}
+        ${occ.capacity ? `<span style="font-size:10px;color:#9ca3af;">${occ.count}/${occ.capacity} passengers</span>` : ''}
       </div>`
     : '';
 
-  if (stale) {
-    return `<div style="font-size:13px;min-width:160px;font-family:Inter,system-ui,sans-serif;">
-      <b>${bus.busName}</b><br/>
-      <span style="color:#D97706;">Signal lost</span><br/>
-      Last seen: ${timeAgo(bus.timestamp)}<br/>
-      <span style="color:#78716C;font-size:11px;">Route: ${bus.routeName}</span>
-      ${occHtml}
-    </div>`;
-  }
-  return `<div style="font-size:13px;min-width:160px;font-family:Inter,system-ui,sans-serif;">
-    <b>${bus.busName}</b><br/>
-    Route: ${bus.routeName}<br/>
-    Speed: ${Math.round(bus.speedKmh)} km/h<br/>
-    <span style="color:#78716C;font-size:11px;">Updated: ${timeAgo(bus.timestamp)}</span>
+  return `<div style="padding:12px 14px;min-width:180px;font-family:Inter,system-ui,sans-serif;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <div style="width:32px;height:32px;border-radius:50%;background:${stale ? MU_GREY : bus.routeColor};display:flex;align-items:center;justify-content:center;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></svg>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:14px;">${bus.busName}</div>
+        <div style="font-size:11px;color:#6b7280;">${bus.routeName}</div>
+      </div>
+    </div>
+    <div style="border-top:1px solid #e5e7eb;padding-top:8px;margin-top:4px;">
+      <div style="display:flex;align-items:center;font-size:12px;margin-bottom:3px;">${statusDot} ${statusText}</div>
+      ${!stale ? `<div style="font-size:12px;color:#374151;">Speed: ${Math.round(bus.speedKmh)} km/h</div>` : ''}
+      <div style="font-size:11px;color:#9ca3af;">Updated: ${timeAgo(bus.timestamp)}</div>
+    </div>
     ${occHtml}
   </div>`;
 }

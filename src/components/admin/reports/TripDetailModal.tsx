@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import type { TripDetailData } from "@/hooks/useReportsData";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "@/styles/leaflet-custom.css";
+import { TILE_URL, TILE_ATTRIBUTION } from "@/lib/mapConfig";
 
 interface Props {
   open: boolean;
@@ -18,12 +20,11 @@ function TripMap({ locations }: { locations: { lat: number; lng: number }[] }) {
 
   useEffect(() => {
     if (!mapRef.current || locations.length === 0) return;
-    const map = L.map(mapRef.current).setView([locations[0].lat, locations[0].lng], 14);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OSM",
-    }).addTo(map);
+    const map = L.map(mapRef.current, { zoomControl: false, scrollWheelZoom: true, doubleClickZoom: true }).setView([locations[0].lat, locations[0].lng], 16);
+    L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION }).addTo(map);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
     const coords: L.LatLngExpression[] = locations.map(l => [l.lat, l.lng]);
-    L.polyline(coords, { color: "hsl(222, 47%, 11%)", weight: 3 }).addTo(map);
+    L.polyline(coords, { color: "#CC1B1B", weight: 4, opacity: 0.8 }).addTo(map);
     map.fitBounds(L.latLngBounds(coords), { padding: [20, 20] });
     return () => { map.remove(); };
   }, [locations]);
