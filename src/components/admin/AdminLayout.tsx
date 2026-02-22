@@ -48,20 +48,24 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:w-60 flex-col border-r border-border bg-sidebar shrink-0">
-        <div className="p-4 border-b border-sidebar-border">
-          <h1 className="text-lg font-bold text-sidebar-foreground">🚌 UniRoute Admin</h1>
+      {/* Desktop Sidebar — dark */}
+      <aside className="hidden md:flex md:w-64 flex-col bg-sidebar shrink-0">
+        <div className="p-5 border-b border-sidebar-border">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🚌</span>
+            <h1 className="text-lg font-extrabold tracking-tight text-sidebar-foreground">UniRoute</h1>
+          </div>
+          <p className="text-xs text-sidebar-foreground/50 mt-0.5 ml-9">Admin Dashboard</p>
         </div>
-        <nav className="flex-1 p-2 space-y-1">
+        <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => onViewChange(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 activeView === item.id
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               }`}
             >
               <span className="text-base">{item.emoji}</span>
@@ -69,12 +73,22 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
             </button>
           ))}
         </nav>
-        <div className="p-2 border-t border-sidebar-border">
+        <div className="p-3 border-t border-sidebar-border space-y-3">
+          {/* User info */}
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sm font-bold text-sidebar-accent-foreground">
+              {(displayName ?? "A").charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{displayName}</p>
+              <p className="text-xs text-sidebar-foreground/40 truncate">{user?.email}</p>
+            </div>
+          </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-foreground/50 hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-4 w-4" />
             Logout
           </button>
         </div>
@@ -83,39 +97,46 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="shrink-0 h-14 flex items-center justify-between px-4 border-b border-border bg-card">
-          <h2 className="text-base font-semibold text-card-foreground md:hidden">🚌 UniRoute Admin</h2>
-          <h2 className="text-base font-semibold text-card-foreground hidden md:block">
-            {navItems.find((n) => n.id === activeView)?.emoji} {navItems.find((n) => n.id === activeView)?.label}
+        <header className="shrink-0 h-14 flex items-center justify-between px-5 border-b border-border bg-card shadow-sm">
+          <h2 className="text-base font-bold tracking-tight text-card-foreground md:hidden flex items-center gap-2">
+            <span>🚌</span> UniRoute
           </h2>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-mono text-muted-foreground">{timeStr}</span>
+          <h2 className="text-base font-bold tracking-tight text-card-foreground hidden md:flex items-center gap-2">
+            <span>{navItems.find((n) => n.id === activeView)?.emoji}</span>
+            {navItems.find((n) => n.id === activeView)?.label}
+          </h2>
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-mono text-muted-foreground tabular-nums">{timeStr}</span>
             <span className="text-sm font-medium text-foreground hidden sm:block">{displayName}</span>
           </div>
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-background">
           {children}
         </main>
 
         {/* Mobile Bottom Nav */}
-        <nav className="md:hidden shrink-0 border-t border-border bg-background flex">
+        <nav className="md:hidden shrink-0 border-t border-border bg-card flex safe-bottom">
           {navItems.slice(0, 5).map((item) => (
             <button
               key={item.id}
               onClick={() => onViewChange(item.id)}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-xs transition-colors ${
-                activeView === item.id ? "text-primary font-semibold" : "text-muted-foreground"
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-semibold transition-all min-h-[52px] ${
+                activeView === item.id ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <span className="text-lg">{item.emoji}</span>
+              <div className={`px-3 py-0.5 rounded-full transition-colors ${
+                activeView === item.id ? "bg-primary/10" : ""
+              }`}>
+                <span className="text-lg">{item.emoji}</span>
+              </div>
               <span className="truncate max-w-[60px]">{item.label.split(" ")[0]}</span>
             </button>
           ))}
           <button
             onClick={handleLogout}
-            className="flex-1 flex flex-col items-center gap-0.5 py-2 text-xs text-destructive"
+            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-semibold text-muted-foreground min-h-[52px]"
           >
             <span className="text-lg">🚪</span>
             <span>Logout</span>

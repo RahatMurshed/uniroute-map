@@ -1,22 +1,21 @@
 import type { AdminBus } from "@/hooks/useAdminData";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 
 function getStatusBadge(bus: AdminBus) {
   if (!bus.tripStatus) {
-    return <Badge variant="outline" className="gap-1"><span>⚫</span>Inactive</Badge>;
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground">⚫ Inactive</span>;
   }
   if (bus.tripStatus === "delayed") {
-    return <Badge className="gap-1 bg-yellow-500/15 text-yellow-700 border-yellow-500/30"><span>🟡</span>Delayed</Badge>;
+    return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-warning/10 text-warning border border-warning/20">🟡 Delayed</span>;
   }
   if (bus.lastPing) {
     const ageSec = (Date.now() - new Date(bus.lastPing).getTime()) / 1000;
     if (ageSec > 120) {
-      return <Badge variant="destructive" className="gap-1"><span>🔴</span>Offline</Badge>;
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-destructive/10 text-destructive border border-destructive/20">🔴 Offline</span>;
     }
   }
-  return <Badge className="gap-1 bg-emerald-500/15 text-emerald-700 border-emerald-500/30"><span>🟢</span>Active</Badge>;
+  return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success/10 text-success border border-success/20">🟢 Active</span>;
 }
 
 function timeAgo(ts: string | null): string {
@@ -35,16 +34,16 @@ interface FleetStatusTableProps {
 
 export default function FleetStatusTable({ buses, onViewOnMap }: FleetStatusTableProps) {
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
+    <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Bus Name</TableHead>
-            <TableHead className="hidden sm:table-cell">Driver</TableHead>
-            <TableHead className="hidden sm:table-cell">Route</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Last Ping</TableHead>
-            <TableHead className="text-right">Action</TableHead>
+          <TableRow className="bg-muted/50 hover:bg-muted/50">
+            <TableHead className="text-xs font-semibold uppercase tracking-wider">Bus Name</TableHead>
+            <TableHead className="hidden sm:table-cell text-xs font-semibold uppercase tracking-wider">Driver</TableHead>
+            <TableHead className="hidden sm:table-cell text-xs font-semibold uppercase tracking-wider">Route</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider">Status</TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider">Last Ping</TableHead>
+            <TableHead className="text-right text-xs font-semibold uppercase tracking-wider">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -53,11 +52,11 @@ export default function FleetStatusTable({ buses, onViewOnMap }: FleetStatusTabl
               <TableCell colSpan={6} className="text-center text-muted-foreground py-8">No buses configured</TableCell>
             </TableRow>
           ) : (
-            buses.map((bus) => (
-              <TableRow key={bus.id}>
+            buses.map((bus, idx) => (
+              <TableRow key={bus.id} className={`hover:bg-muted/30 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/10"}`}>
                 <TableCell>
-                  <div className="font-medium text-foreground">{bus.name}</div>
-                  {bus.licensePlate && <div className="text-xs text-muted-foreground">{bus.licensePlate}</div>}
+                  <div className="font-semibold text-foreground">{bus.name}</div>
+                  {bus.licensePlate && <div className="text-xs text-muted-foreground font-mono">{bus.licensePlate}</div>}
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-sm text-foreground">{bus.driverName ?? "—"}</TableCell>
                 <TableCell className="hidden sm:table-cell text-sm text-foreground">{bus.routeName ?? "—"}</TableCell>
@@ -69,6 +68,7 @@ export default function FleetStatusTable({ buses, onViewOnMap }: FleetStatusTabl
                     size="sm"
                     disabled={bus.lat == null}
                     onClick={() => onViewOnMap(bus.id)}
+                    className="text-primary hover:text-primary/80 font-medium"
                   >
                     View on Map
                   </Button>

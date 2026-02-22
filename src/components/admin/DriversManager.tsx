@@ -8,13 +8,8 @@ import DriverForm from "./drivers/DriverForm";
 
 export default function DriversManager() {
   const {
-    drivers,
-    buses,
-    loading,
-    createDriver,
-    updateDriver,
-    deactivateDriver,
-    reactivateDriver,
+    drivers, buses, loading,
+    createDriver, updateDriver, deactivateDriver, reactivateDriver,
   } = useDriverManager();
 
   const [showForm, setShowForm] = useState(false);
@@ -47,17 +42,14 @@ export default function DriversManager() {
   const inactiveDrivers = drivers.filter((d) => d.role === "inactive_driver");
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-foreground">Driver Management</h2>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">Driver Management</h2>
         <Button
-          onClick={() => {
-            setEditing(null);
-            setShowForm(true);
-          }}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          onClick={() => { setEditing(null); setShowForm(true); }}
+          className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold gap-1.5 shadow-md"
         >
-          <Plus className="h-4 w-4 mr-1" />
+          <Plus className="h-4 w-4" />
           Add Driver
         </Button>
       </div>
@@ -65,41 +57,30 @@ export default function DriversManager() {
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 rounded-lg" />
+            <Skeleton key={i} className="h-40 rounded-xl" />
           ))}
         </div>
       ) : drivers.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <p className="text-lg">👤 No drivers added yet</p>
-          <p className="text-sm mt-1">Click "+ Add Driver" to create driver accounts.</p>
+        <div className="text-center py-16 bg-card rounded-xl border border-border shadow-sm">
+          <span className="text-4xl">👤</span>
+          <p className="text-base font-semibold text-foreground mt-3">No drivers added yet</p>
+          <p className="text-sm text-muted-foreground mt-1">Click "+ Add Driver" to create driver accounts.</p>
         </div>
       ) : (
         <div className="space-y-6">
           {activeDrivers.length > 0 && (
             <div className="space-y-3">
               {activeDrivers.map((d) => (
-                <DriverCard
-                  key={d.id}
-                  driver={d}
-                  onEdit={handleEdit}
-                  onDeactivate={deactivateDriver}
-                  onReactivate={reactivateDriver}
-                />
+                <DriverCard key={d.id} driver={d} onEdit={handleEdit} onDeactivate={deactivateDriver} onReactivate={reactivateDriver} />
               ))}
             </div>
           )}
 
           {inactiveDrivers.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Inactive Drivers</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Inactive Drivers</h3>
               {inactiveDrivers.map((d) => (
-                <DriverCard
-                  key={d.id}
-                  driver={d}
-                  onEdit={handleEdit}
-                  onDeactivate={deactivateDriver}
-                  onReactivate={reactivateDriver}
-                />
+                <DriverCard key={d.id} driver={d} onEdit={handleEdit} onDeactivate={deactivateDriver} onReactivate={reactivateDriver} />
               ))}
             </div>
           )}

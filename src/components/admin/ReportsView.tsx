@@ -42,16 +42,14 @@ export default function ReportsView() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h2 className="text-2xl font-bold text-foreground">📊 Trip Reports</h2>
-        <Button onClick={exportCsv} variant="outline" size="sm" disabled={trips.length === 0}>
-          <Download className="h-4 w-4 mr-1" />
+        <h2 className="text-xl font-bold tracking-tight text-foreground">📊 Trip Reports</h2>
+        <Button onClick={exportCsv} variant="outline" size="sm" disabled={trips.length === 0} className="rounded-xl gap-1.5">
+          <Download className="h-4 w-4" />
           Export CSV
         </Button>
       </div>
 
-      {/* Date filters */}
       <div className="flex flex-wrap items-center gap-2">
         {presets.map((p) => (
           <Button
@@ -59,6 +57,7 @@ export default function ReportsView() {
             variant={preset === p.id ? "default" : "outline"}
             size="sm"
             onClick={() => setPreset(p.id)}
+            className="rounded-xl font-semibold"
           >
             {p.label}
           </Button>
@@ -67,7 +66,7 @@ export default function ReportsView() {
           <div className="flex items-center gap-2 flex-wrap">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn(!customFrom && "text-muted-foreground")}>
+                <Button variant="outline" size="sm" className={cn("rounded-xl", !customFrom && "text-muted-foreground")}>
                   <CalendarIcon className="h-4 w-4 mr-1" />
                   {customFrom ? format(customFrom, "dd MMM yyyy") : "From"}
                 </Button>
@@ -79,7 +78,7 @@ export default function ReportsView() {
             <span className="text-muted-foreground">→</span>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn(!customTo && "text-muted-foreground")}>
+                <Button variant="outline" size="sm" className={cn("rounded-xl", !customTo && "text-muted-foreground")}>
                   <CalendarIcon className="h-4 w-4 mr-1" />
                   {customTo ? format(customTo, "dd MMM yyyy") : "To"}
                 </Button>
@@ -93,7 +92,7 @@ export default function ReportsView() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-40">
+        <div className="flex items-center justify-center h-40 bg-card rounded-xl border border-border">
           <p className="text-muted-foreground">Loading reports…</p>
         </div>
       ) : (

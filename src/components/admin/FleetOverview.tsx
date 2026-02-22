@@ -20,31 +20,30 @@ export default function FleetOverview({ buses, exceptions, stats, loading, onRef
 
   const handleViewOnMap = useCallback((busId: string) => {
     setCenterBusId(busId);
-    // Scroll to map
     document.getElementById("admin-fleet-map")?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   return (
     <div className="space-y-6 max-w-6xl">
-      {/* Stats */}
       <StatsRow stats={stats} />
 
-      {/* Fleet Map */}
       <div id="admin-fleet-map">
-        <h3 className="text-sm font-semibold text-foreground mb-2">🗺️ Live Fleet Map</h3>
-        <AdminFleetMap
-          buses={buses}
-          centerOnBusId={centerBusId}
-          onCenterDone={() => setCenterBusId(null)}
-        />
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🗺️ Live Fleet Map</h3>
+        <div className="rounded-xl overflow-hidden border border-border shadow-sm">
+          <AdminFleetMap
+            buses={buses}
+            centerOnBusId={centerBusId}
+            onCenterDone={() => setCenterBusId(null)}
+          />
+        </div>
       </div>
 
-      {/* Fleet Table */}
       <div>
-        <h3 className="text-sm font-semibold text-foreground mb-2">🚌 Fleet Status</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">🚌 Fleet Status</h3>
         {buses.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 rounded-xl border border-border bg-muted/30 text-center">
-            <p className="text-lg text-muted-foreground">🚌 No buses configured yet</p>
+          <div className="flex flex-col items-center justify-center h-48 rounded-xl border border-dashed border-border bg-card text-center shadow-sm">
+            <span className="text-4xl mb-2">🚌</span>
+            <p className="text-base font-semibold text-foreground">No buses configured yet</p>
             <p className="text-sm text-muted-foreground mt-1">Go to Route Manager to add routes and buses.</p>
           </div>
         ) : (
@@ -52,18 +51,16 @@ export default function FleetOverview({ buses, exceptions, stats, loading, onRef
         )}
       </div>
 
-      {/* Today's Exceptions */}
       <TodaysExceptions exceptions={exceptions} />
 
-      {/* Quick Actions */}
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" className="gap-1">
+        <Button variant="outline" size="sm" className="gap-1.5 rounded-lg">
           <Plus className="h-4 w-4" /> Add Override
         </Button>
-        <Button variant="outline" size="sm" className="gap-1">
+        <Button variant="outline" size="sm" className="gap-1.5 rounded-lg">
           <Plus className="h-4 w-4" /> Add Route
         </Button>
-        <Button variant="outline" size="sm" className="gap-1" onClick={onRefresh} disabled={loading}>
+        <Button variant="outline" size="sm" className="gap-1.5 rounded-lg" onClick={onRefresh} disabled={loading}>
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh All
         </Button>
       </div>

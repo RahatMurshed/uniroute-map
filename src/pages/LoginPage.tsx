@@ -4,44 +4,30 @@ import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
 function friendlyError(err: any): string {
   const msg = (err?.message ?? "").toLowerCase();
   const status = err?.status ?? err?.statusCode;
 
-  // Network/fetch errors
   if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
     return "Connection error. Please check your internet and try again.";
   }
-
-  // Rate limited
   if (status === 429 || msg.includes("rate") || msg.includes("too many")) {
     return "Too many failed attempts. Please wait 5 minutes before trying again.";
   }
-
-  // Invalid credentials — Supabase returns "Invalid login credentials"
   if (msg.includes("invalid login credentials") || msg.includes("invalid credentials")) {
     return "Incorrect email or password. Please try again.";
   }
-
-  // Email not confirmed
   if (msg.includes("email not confirmed")) {
     return "Your email address has not been verified. Please check your inbox.";
   }
-
-  // User not found (some Supabase configs)
   if (msg.includes("user not found")) {
     return "No account found with this email address.";
   }
-
-  // User banned/disabled
   if (msg.includes("banned") || msg.includes("disabled")) {
     return "Your account has been deactivated. Please contact your administrator.";
   }
-
   return err?.message || "An unexpected error occurred. Please try again.";
 }
 
@@ -66,8 +52,6 @@ const LoginPage = () => {
 
     try {
       await signIn(email, password);
-
-      // Fetch roles to determine redirect
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Authentication failed.");
 
@@ -94,63 +78,101 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-sm border-border shadow-lg">
-        <CardHeader className="space-y-1 text-center pb-2">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            UniRoute
-          </h1>
-          <p className="text-sm text-muted-foreground">Staff &amp; Driver Portal</p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@university.edu"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={submitting}
-              />
+    <div className="flex min-h-screen">
+      {/* Left panel — brand (hidden on mobile) */}
+      <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-primary to-primary/80 items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-20 w-64 h-64 bg-white rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl" />
+        </div>
+        <div className="relative text-center text-primary-foreground space-y-4 px-8">
+          <div className="text-8xl">🚌</div>
+          <h1 className="text-4xl font-extrabold tracking-tight">UniRoute</h1>
+          <p className="text-lg text-primary-foreground/80 max-w-xs mx-auto leading-relaxed">
+            Real-time university bus tracking for students and staff
+          </p>
+        </div>
+      </div>
+
+      {/* Right panel — login form */}
+      <div className="flex-1 flex flex-col">
+        {/* Mobile header */}
+        <div className="md:hidden bg-gradient-to-r from-primary to-primary/90 px-6 py-8 text-primary-foreground text-center safe-top">
+          <div className="text-5xl mb-2">🚌</div>
+          <h1 className="text-2xl font-extrabold tracking-tight">UniRoute</h1>
+          <p className="text-sm text-primary-foreground/80 mt-1">Staff & Driver Portal</p>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center px-6 py-10">
+          <div className="w-full max-w-sm space-y-8">
+            <div className="hidden md:block space-y-1">
+              <h2 className="text-2xl font-bold tracking-tight text-foreground">Welcome back</h2>
+              <p className="text-sm text-muted-foreground">Staff & Driver Portal</p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in…
-                </>
-              ) : (
-                "Sign In"
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive font-medium">
+                  {error}
+                </div>
               )}
-            </Button>
-            <p className="text-center text-xs text-muted-foreground">
-              <button type="button" className="underline hover:text-foreground" onClick={() => {}}>
-                Forgot password?
-              </button>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Email Address
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@university.edu"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={submitting}
+                  className="h-12 rounded-xl border-border bg-card text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-primary"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Password
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={submitting}
+                  className="h-12 rounded-xl border-border bg-card text-foreground placeholder:text-muted-foreground/60 focus-visible:ring-primary"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base shadow-md transition-all active:scale-[0.98]"
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in…
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
+
+              <p className="text-center text-xs text-muted-foreground">
+                <button type="button" className="underline hover:text-foreground transition-colors" onClick={() => {}}>
+                  Forgot password?
+                </button>
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

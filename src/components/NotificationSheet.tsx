@@ -25,7 +25,6 @@ export default function NotificationSheet({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
-  // Pre-fill favourite stop
   useEffect(() => {
     if (open) {
       if (favouriteStopId && stops.some((s) => s.id === favouriteStopId)) {
@@ -54,41 +53,40 @@ export default function NotificationSheet({
   return (
     <>
       <div
-        className={`fixed inset-0 z-[2000] bg-black/50 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 z-[2000] bg-foreground/40 backdrop-blur-sm transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={onClose}
       />
       <div
-        className={`fixed inset-x-0 bottom-0 z-[2001] rounded-t-2xl bg-background border-t border-border shadow-lg transition-transform duration-300 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
+        className={`fixed inset-x-0 bottom-0 z-[2001] rounded-t-2xl bg-card border-t border-border shadow-lg transition-transform duration-300 ease-out ${open ? "translate-y-0" : "translate-y-full"}`}
       >
-        <div className="mx-auto max-w-md px-5 pb-8 pt-4 space-y-4">
-          <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/30" />
+        <div className="mx-auto max-w-md px-5 pb-8 pt-4 space-y-4 safe-bottom">
+          <div className="mx-auto h-1 w-10 rounded-full bg-muted-foreground/20" />
 
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Get Bus Alerts 🔔</h2>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <h2 className="text-lg font-bold tracking-tight text-foreground">Get Bus Alerts 🔔</h2>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
               <X className="h-5 w-5" />
             </button>
           </div>
 
           {result ? (
-            <div className={`rounded-xl p-4 text-center text-sm ${
+            <div className={`rounded-xl p-4 text-center text-sm font-medium ${
               result.type === "success" 
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" 
+                ? "bg-success/10 text-success" 
                 : "bg-destructive/10 text-destructive"
             }`}>
               {result.msg}
             </div>
           ) : (
             <>
-              {/* Route select */}
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">
-                  Choose which route to follow:
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Choose which route to follow
                 </label>
                 <select
                   value={routeId}
                   onChange={(e) => setRouteId(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Select a route</option>
                   {routes.map((r) => (
@@ -97,15 +95,14 @@ export default function NotificationSheet({
                 </select>
               </div>
 
-              {/* Stop select */}
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">
-                  Your stop:
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Your stop
                 </label>
                 <select
                   value={stopId}
                   onChange={(e) => setStopId(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Select a stop</option>
                   {stops.map((s) => (
@@ -114,16 +111,15 @@ export default function NotificationSheet({
                 </select>
               </div>
 
-              {/* Notify options */}
-              <div>
-                <p className="text-sm font-medium text-foreground mb-2">Notify me when bus is:</p>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notify me when bus is</p>
                 <div className="space-y-2">
                   {[
                     { label: "~5 minutes away", defaultOn: true },
                     { label: "Delayed or cancelled", defaultOn: true },
                     { label: "Route changed today", defaultOn: true },
                   ].map((opt) => (
-                    <label key={opt.label} className="flex items-center gap-2 text-sm text-foreground">
+                    <label key={opt.label} className="flex items-center gap-2 text-sm text-foreground min-h-[36px]">
                       <input type="checkbox" defaultChecked={opt.defaultOn} className="rounded" disabled />
                       {opt.label}
                     </label>
@@ -133,13 +129,13 @@ export default function NotificationSheet({
 
               <div className="space-y-3 pt-2">
                 <Button
-                  className="w-full py-5 text-base"
+                  className="w-full h-12 rounded-xl text-base font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all active:scale-[0.98]"
                   disabled={!routeId || !stopId || submitting}
                   onClick={handleSubscribe}
                 >
                   {submitting ? "Enabling…" : "Enable Notifications 🔔"}
                 </Button>
-                <Button variant="ghost" className="w-full" onClick={onClose}>
+                <Button variant="ghost" className="w-full rounded-xl" onClick={onClose}>
                   Not now
                 </Button>
               </div>
