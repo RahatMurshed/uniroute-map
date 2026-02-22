@@ -1,9 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Star, MapPin, Bus, AlertTriangle, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { haversineDistance, calculateETAsForStop } from "@/lib/eta";
 import type { BusLocation, Stop, RouteInfo } from "@/hooks/useMapData";
+import { getOccupancyPillClasses, type OccupancyInfo } from "@/hooks/useOccupancy";
+import JourneyPlanner from "@/components/JourneyPlanner";
+import { getRouteServiceStatus, RouteStatusBadge, ServiceInfoFooter } from "@/components/ServiceInfo";
 
 interface FavouriteStop {
   stop_id: string;
@@ -93,9 +96,11 @@ interface ScheduleViewProps {
   favouriteStop: FavouriteStop | null;
   onRemoveFavourite: () => void;
   onViewFavOnMap: () => void;
+  occupancy?: Map<string, OccupancyInfo>;
+  rawRoutes?: Map<string, { stop_id: string; scheduled_time?: string }[]>;
 }
 
-export default function ScheduleView({ busLocations, stops, routes, favouriteStop, onRemoveFavourite, onViewFavOnMap }: ScheduleViewProps) {
+export default function ScheduleView({ busLocations, stops, routes, favouriteStop, onRemoveFavourite, onViewFavOnMap, occupancy, rawRoutes: externalRawRoutes }: ScheduleViewProps) {
   const [exceptions, setExceptions] = useState<Exception[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
@@ -107,9 +112,7 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const todayLabel = useMemo(() => {
-    return new Date().toLocaleDateString("en-US", {
-      weekday: "long", day: "numeric", month: "long", year: "numeric",
-    });
+    return new Date().toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   }, []);
 
   const fetchExceptions = useCallback(async () => {
@@ -138,18 +141,21 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
     return () => clearInterval(iv);
   }, []);
 
-  const [rawRoutes, setRawRoutes] = useState<Map<string, any[]>>(new Map());
+  const [internalRawRoutes, setInternalRawRoutes] = useState<Map<string, any[]>>(new Map());
   useEffect(() => {
+    if (externalRawRoutes && externalRawRoutes.size > 0) return; // use external
     const fetchRaw = async () => {
       const { data } = await supabase.from("routes").select("id, stop_sequence");
       if (data) {
         const map = new Map<string, any[]>();
         for (const r of data) { map.set(r.id, parseStopSequenceObjects(r.stop_sequence)); }
-        setRawRoutes(map);
+        setInternalRawRoutes(map);
       }
     };
     fetchRaw();
-  }, []);
+  }, [externalRawRoutes]);
+
+  const rawRoutes = (externalRawRoutes && externalRawRoutes.size > 0) ? externalRawRoutes : internalRawRoutes;
 
   const favEtas = useMemo(() => {
     if (!favouriteStop) return [];
@@ -207,15 +213,15 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
 
   const statusIcon = (s: StopScheduleEntry["status"]) => {
     switch (s) {
-      case "passed": return "✅";
-      case "current": return "🚌";
-      case "upcoming": return "⏳";
-      case "cancelled": return "❌";
+      case "passed": return <CheckCircle2 className="h-3.5 w-3.5 text-success" />;
+      case "current": return <Bus className="h-3.5 w-3.5 text-primary" />;
+      case "upcoming": return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
+      case "cancelled": return <XCircle className="h-3.5 w-3.5 text-destructive" />;
     }
   };
 
   const exceptionLabel = (e: Exception) => {
-    if (e.type === "cancellation") return `${e.busName} — Cancelled today ❌`;
+    if (e.type === "cancellation") return `${e.busName} — Cancelled today`;
     if (e.type === "delay" && e.timeOffsetMins) return `${e.busName} — Running ${e.timeOffsetMins} mins late`;
     if (e.type === "route_change" || e.overrideRouteId) return `${e.busName} — Route changed today`;
     return `${e.busName} — ${e.notes ?? e.type}`;
@@ -244,7 +250,17 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
                 ? "bg-success/10 text-success border border-success/20"
                 : "bg-destructive/10 text-destructive border border-destructive/20"
             }`}>
-              {buses.length > 0 ? "🟢 Service Running" : "🔴 No Active Service"}
+              {buses.length > 0 ? (
+                <span className="flex items-center gap-1">
+                  <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" /><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-success" /></span>
+                  Service Running
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <span className="relative flex h-1.5 w-1.5"><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-destructive" /></span>
+                  No Active Service
+                </span>
+              )}
             </Badge>
             <button
               onClick={refresh}
@@ -260,22 +276,30 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
       </div>
 
       <div className="px-4 py-3 space-y-3">
+        {/* Journey Planner */}
+        <JourneyPlanner
+          stops={stops}
+          routes={routes}
+          buses={buses}
+          allStops={stops}
+          occupancy={occupancy ?? new Map()}
+          rawRoutes={rawRoutes}
+        />
+
         {/* Favourite stop card */}
         {favouriteStop ? (
           <div className="bg-card rounded-xl border border-primary/20 shadow-sm p-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl shrink-0">⭐</span>
+              <Star className="h-6 w-6 text-yellow-400 fill-yellow-400 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Your Favourite Stop</p>
-                <h3 className="font-bold text-foreground">📍 {favouriteStop.stop_name}</h3>
-                {favouriteStop.landmark && (
-                  <p className="text-xs text-muted-foreground">{favouriteStop.landmark}</p>
-                )}
+                <h3 className="font-bold text-foreground flex items-center gap-1"><MapPin className="h-4 w-4 text-primary" /> {favouriteStop.stop_name}</h3>
+                {favouriteStop.landmark && <p className="text-xs text-muted-foreground">{favouriteStop.landmark}</p>}
                 {favEtas.length > 0 ? (
                   <div className="mt-2 space-y-1">
                     {favEtas.slice(0, 2).map((eta) => (
                       <p key={eta.busId} className="text-sm text-foreground">
-                        🚌 {eta.busName} – {eta.routeName}<br />
+                        <Bus className="h-3.5 w-3.5 inline mr-1" />{eta.busName} – {eta.routeName}<br />
                         <span className="text-muted-foreground">{eta.label}</span>
                       </p>
                     ))}
@@ -286,17 +310,9 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
                   </p>
                 )}
                 <div className="flex items-center gap-3 mt-3">
-                  <button
-                    onClick={onViewFavOnMap}
-                    className="text-sm font-semibold text-primary hover:underline min-h-[44px] flex items-center"
-                  >
-                    View on Map
-                  </button>
-                  <button
-                    onClick={onRemoveFavourite}
-                    className="text-sm font-medium text-muted-foreground hover:text-destructive min-h-[44px] flex items-center"
-                  >
-                    Remove ☆
+                  <button onClick={onViewFavOnMap} className="text-sm font-semibold text-primary hover:underline min-h-[44px] flex items-center">View on Map</button>
+                  <button onClick={onRemoveFavourite} className="text-sm font-medium text-muted-foreground hover:text-destructive min-h-[44px] flex items-center gap-1">
+                    <Star className="h-3.5 w-3.5" /> Remove
                   </button>
                 </div>
               </div>
@@ -304,18 +320,16 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-border p-4 text-center bg-card">
-            <p className="text-sm text-muted-foreground">Tap ⭐ on any stop to save your favourite</p>
+            <p className="text-sm text-muted-foreground flex items-center justify-center gap-1"><Star className="h-4 w-4" /> Tap the star on any stop to save your favourite</p>
           </div>
         )}
 
         {/* Exception banner */}
         {exceptions.length > 0 && (
           <div className="rounded-xl bg-warning/10 border border-warning/20 p-3.5">
-            <p className="text-sm font-bold text-warning mb-1">⚠️ Service Changes Today</p>
+            <p className="text-sm font-bold text-warning mb-1 flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> Service Changes Today</p>
             <div className="space-y-1">
-              {exceptions.map((e) => (
-                <p key={e.id} className="text-sm text-foreground">{exceptionLabel(e)}</p>
-              ))}
+              {exceptions.map((e) => <p key={e.id} className="text-sm text-foreground">{exceptionLabel(e)}</p>)}
             </div>
           </div>
         )}
@@ -325,27 +339,39 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
           const active = activeRouteIds.has(route.id);
           const todayActive = isTodayActive(route.activeDays ?? null);
           const schedule = getStopScheduleWithTimes(route);
+          const serviceStatus = getRouteServiceStatus(route, buses, rawRoutes.get(route.id));
+
+          // Get occupancy for active route
+          const routeBus = buses.find((b) => b.routeId === route.id);
+          const routeOcc = routeBus && occupancy ? occupancy.get(routeBus.tripId) : undefined;
 
           return (
             <div key={route.id} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-              {/* Route header with color accent */}
               <div className="flex items-center gap-3 px-4 pt-4 pb-2">
-                <div
-                  className="w-1 h-10 rounded-full shrink-0"
-                  style={{ backgroundColor: route.colorHex }}
-                />
+                <div className="w-1 h-10 rounded-full shrink-0" style={{ backgroundColor: route.colorHex }} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="font-bold text-foreground">{route.name}</span>
-                    {!todayActive ? (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Not today</span>
-                    ) : active ? (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20">ACTIVE</span>
-                    ) : (
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Inactive</span>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {routeOcc && (
+                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full border ${getOccupancyPillClasses(routeOcc.level)}`}>
+                          {routeOcc.label}
+                        </span>
+                      )}
+                      <RouteStatusBadge status={serviceStatus} />
+                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{formatActiveDays(route.activeDays ?? null)}</p>
+                  {/* Next departure info for inactive routes */}
+                  {!active && serviceStatus.nextDepartureTime && serviceStatus.status !== "ended" && (
+                    <p className="text-xs text-primary font-medium mt-0.5">
+                      Next departure: {formatTime12(serviceStatus.nextDepartureTime)}
+                      {serviceStatus.minutesUntilNext != null && ` (${serviceStatus.minutesUntilNext < 60 ? `${serviceStatus.minutesUntilNext}m` : `${Math.floor(serviceStatus.minutesUntilNext / 60)}h ${serviceStatus.minutesUntilNext % 60}m`} away)`}
+                    </p>
+                  )}
+                  {serviceStatus.status === "ended" && serviceStatus.nextDepartureTime && (
+                    <p className="text-xs text-muted-foreground mt-0.5">First bus tomorrow: {formatTime12(serviceStatus.nextDepartureTime)}</p>
+                  )}
                 </div>
               </div>
               <div className="px-4 pb-4 pt-1">
@@ -379,7 +405,7 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
                             <span className="text-muted-foreground/40">—</span>
                           )}
                         </span>
-                        <span className="text-center">{statusIcon(entry.status)}</span>
+                        <span className="text-center flex items-center justify-center">{statusIcon(entry.status)}</span>
                       </div>
                     ))}
                   </div>
@@ -388,6 +414,9 @@ export default function ScheduleView({ busLocations, stops, routes, favouriteSto
             </div>
           );
         })}
+
+        {/* Service info footer */}
+        <ServiceInfoFooter routes={routes} rawRoutes={rawRoutes} />
       </div>
     </div>
   );
