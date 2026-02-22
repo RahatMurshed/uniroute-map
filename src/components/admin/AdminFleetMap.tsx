@@ -15,14 +15,22 @@ function getBusColor(bus: AdminBus): string {
   return MU_RED;
 }
 
-function makeBusIcon(color: string) {
+function makeBusIcon(color: string, busName?: string) {
   const isInactive = color === MU_GREY;
+  const opacity = isInactive ? "0.7" : "1";
+  const name = busName || "Bus";
   return L.divIcon({
     className: "",
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
-    popupAnchor: [0, -24],
-    html: `<div style="width:40px;height:40px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 14px rgba(0,0,0,.25);border:3px solid white;opacity:${isInactive ? '0.5' : '1'};">🚌</div>`,
+    iconSize: [106, 60],
+    iconAnchor: [53, 60],
+    popupAnchor: [0, -60],
+    html: `<div style="position:relative;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3));opacity:${opacity};">
+      <div style="background:${color};border-radius:10px;padding:6px 10px 6px 8px;display:flex;align-items:center;gap:6px;min-width:90px;border:2px solid white;box-shadow:0 2px 8px rgba(204,27,27,0.5);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM6 9V6h5v3H6zm7 0V6h5v3h-5z"/></svg>
+        <span style="color:white;font-size:11px;font-weight:700;font-family:system-ui;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;">${name}</span>
+      </div>
+      <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid ${color};margin:0 auto;"></div>
+    </div>`,
   });
 }
 
@@ -82,10 +90,10 @@ export default function AdminFleetMap({ buses, centerOnBusId, onCenterDone }: Ad
 
       if (existing) {
         existing.setLatLng([bus.lat, bus.lng]);
-        existing.setIcon(makeBusIcon(color));
+        existing.setIcon(makeBusIcon(color, bus.name));
         existing.setPopupContent(popupContent);
       } else {
-        const marker = L.marker([bus.lat, bus.lng], { icon: makeBusIcon(color) })
+        const marker = L.marker([bus.lat, bus.lng], { icon: makeBusIcon(color, bus.name) })
           .addTo(map)
           .bindPopup(popupContent);
         markersRef.current.set(bus.id, marker);
