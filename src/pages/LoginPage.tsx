@@ -142,7 +142,37 @@ const LoginPage = () => {
               </p>
             </form>
 
-            <p className="text-center text-[11px] text-muted-foreground/60 pt-4">
+            {/* Demo Access Section */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-white px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Demo Access</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => { setEmail("demo@uniroute.app"); setPassword("demo123456"); }}
+              className="w-full rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 hover:border-[#CC1B1B]/40 hover:bg-[#CC1B1B]/5 transition-all p-4 text-left group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#CC1B1B]/10 flex items-center justify-center shrink-0 group-hover:bg-[#CC1B1B]/20 transition-colors">
+                  <MapPin className="h-5 w-5 text-[#CC1B1B]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-foreground">Admin Demo</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-[#CC1B1B]/10 text-[#CC1B1B] px-2 py-0.5 rounded-full">Try it</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Explore the full admin dashboard</p>
+                </div>
+                <ArrowLeft className="h-4 w-4 text-muted-foreground/40 rotate-180 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </button>
+
+            <p className="text-center text-[11px] text-muted-foreground/60 pt-2">
               Powered by <span className="font-semibold text-muted-foreground/80">UniRoute</span>
             </p>
           </div>
