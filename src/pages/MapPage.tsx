@@ -12,7 +12,8 @@ import ScheduleView from "@/components/ScheduleView";
 import NotificationSheet from "@/components/NotificationSheet";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
-import { Bus, Star, MapPin, Bell, BellRing, BellOff, Map as MapIcon, ClipboardList, Clock, AlertTriangle, X, CheckCircle2, UserCheck, Gauge } from "lucide-react";
+import { Bus, Star, MapPin, Bell, BellRing, BellOff, Map as MapIcon, ClipboardList, Clock, AlertTriangle, X, CheckCircle2, UserCheck, Gauge, LogIn } from "lucide-react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import OccupancyBar from "@/components/OccupancyBar";
 import CountdownTimer from "@/components/CountdownTimer";
@@ -465,6 +466,14 @@ const MapPage = () => {
               {push.permission === "denied" ? <BellOff className="h-5 w-5" /> : push.subscribed ? <BellRing className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
               {push.subscribed && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-destructive rounded-full border-2 border-white" />}
             </button>
+
+            <Link
+              to="/login"
+              className="w-10 h-10 rounded-full flex items-center justify-center shadow-sm border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors"
+              aria-label="Staff Login"
+            >
+              <LogIn className="h-5 w-5" />
+            </Link>
           </div>
         </div>
 
