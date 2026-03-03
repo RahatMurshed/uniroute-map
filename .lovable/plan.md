@@ -1,59 +1,39 @@
 
 
-# Fix: Scheduled times showing "—" in PDF Export
+## Problem
 
-## Root Cause
+The student-facing map page (`/map`) has no login button or link to the staff/driver portal. Users cannot discover the `/login` route without manually typing it in the URL.
 
-The PDF export hook (`src/hooks/usePdfExport.ts`) reads `entry.depart_time` from the stop sequence, but the actual JSONB field stored in the database is `scheduled_time`. Since `depart_time` is always `undefined`, every stop falls back to "—".
+## Plan
 
-## Changes
+### 1. Add a "Staff Login" button to the MapPage header
 
-### File: `src/hooks/usePdfExport.ts`
+In `src/pages/MapPage.tsx`, add a subtle login icon-button in the top bar's right section (next to the Live indicator and notification bell):
 
-**1. Fix the type definition (line 11)**
+- Use a `LogIn` icon from lucide-react
+- Wrap it in a `Link` (or `useNavigate`) pointing to `/login`
+- Style it as a small round button matching the existing bell button style: `w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm`
+- Tooltip or aria-label: "Staff Login"
 
-Change:
-```typescript
-stopSequence: { stop_id: string; depart_time: string }[] | null;
-```
-To:
-```typescript
-stopSequence: { stop_id: string; scheduled_time: string }[] | null;
-```
+### 2. Polish the LoginPage for portfolio impact
 
-**2. Fix the time field access (line 245)**
+Redesign `src/pages/LoginPage.tsx` to look premium and impressive:
 
-Change:
-```typescript
-const time = entry.depart_time ?? "—";
-```
-To:
-```typescript
-const rawTime = entry.scheduled_time ?? "";
-const time = rawTime ? formatTime12(rawTime) : "—";
-```
+- **Left panel** (desktop): Dark background `#0F172A` instead of bland `bg-secondary`. Add subtle gradient orbs (similar to driver page). Show UniRoute logo, tagline, and 3 feature highlights (Real-time tracking, Smart ETA, Push notifications) with small icons — demonstrates the product's value.
+- **Right panel**: Clean white form area with refined spacing.
+- **Mobile**: Dark branded header with logo, flowing into the white form below.
+- **Form polish**: Larger inputs (h-14), rounder corners (rounded-2xl), the Sign In button uses `bg-[#CC1B1B]` with `hover:bg-[#A81515]` to match the app's red branding consistently. Add a subtle "Powered by UniRoute" footer.
+- **Forgot password button**: Keep as-is (non-functional placeholder).
 
-**3. Add a 12-hour time formatter**
+### 3. Files to modify
 
-Add a small helper function near the top of the file:
-```typescript
-function formatTime12(t: string): string {
-  if (!t) return "—";
-  const [h, m] = t.split(":");
-  const hr = parseInt(h, 10);
-  const ampm = hr >= 12 ? "PM" : "AM";
-  const hr12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
-  return `${hr12}:${m} ${ampm}`;
-}
-```
+| File | Change |
+|------|--------|
+| `src/pages/MapPage.tsx` | Add `LogIn` icon import + login button in header right section |
+| `src/pages/LoginPage.tsx` | Redesign with dark left panel, feature highlights, branded red button, polished inputs |
 
-This will produce the expected output like "8:00 AM", "8:10 AM" instead of "—".
+### Technical notes
+- No new dependencies needed — uses existing lucide-react icons and Tailwind classes
+- No routing changes — `/login` route already exists in `App.tsx`
+- All existing login logic (auth, role-based redirect, error handling) stays untouched
 
-## Result
-
-| Before | After |
-|--------|-------|
-| Main Gate — | Main Gate 8:00 AM |
-| Hostel Block A — | Hostel Block A 8:10 AM |
-
-Only one file is modified: `src/hooks/usePdfExport.ts`.
