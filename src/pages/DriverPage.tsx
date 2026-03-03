@@ -283,7 +283,7 @@ const DriverPage = () => {
           </div>
           <h2 className="text-xl font-bold tracking-tight text-white">Location Required</h2>
           <p className="text-sm text-white/60 leading-relaxed">
-            MU Bus Tracker needs GPS access to broadcast your bus location to students.
+            UniRoute needs GPS access to broadcast your bus location to students.
           </p>
           <div className="text-left bg-white/5 rounded-2xl border border-white/10 p-4 space-y-2 text-sm">
             <p className="font-semibold text-white">To enable:</p>
@@ -328,8 +328,8 @@ const DriverPage = () => {
       {/* Header */}
       <header className="flex items-center justify-between px-5 py-4 safe-top">
         <div className="flex items-center gap-2.5">
-          <img src="/metropolitan-logo.png" alt="MU" className="h-7 w-7 object-contain brightness-0 invert" />
-          <span className="text-base font-bold text-white tracking-tight">MU Transport</span>
+          <img src="/uniroute-logo.png" alt="UniRoute" className="h-7 w-7 object-contain brightness-0 invert" />
+          <span className="text-base font-bold text-white tracking-tight">UniRoute</span>
         </div>
         <button onClick={handleLogout} className="text-white/50 hover:text-white p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors">
           <LogOut className="h-5 w-5" />

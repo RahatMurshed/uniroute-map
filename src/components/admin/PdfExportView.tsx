@@ -21,8 +21,8 @@ export default function PdfExportView() {
   const [includeOverrides, setIncludeOverrides] = useState(true);
   const [includeDriverInfo, setIncludeDriverInfo] = useState(true);
   const [includeGpsStats, setIncludeGpsStats] = useState(false);
-  const [universityName, setUniversityName] = useState("Metropolitan University");
-  const [footerNote, setFooterNote] = useState("Metropolitan University Transport Services");
+  const [universityName, setUniversityName] = useState("UniRoute");
+  const [footerNote, setFooterNote] = useState("UniRoute Transport Services");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {

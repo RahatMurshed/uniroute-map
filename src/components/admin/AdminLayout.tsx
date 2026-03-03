@@ -52,9 +52,9 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
       <aside className="hidden md:flex md:w-64 flex-col bg-sidebar shrink-0">
         <div className="p-5 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            <img src="/metropolitan-logo.png" alt="Metropolitan University" className="h-8 w-8 object-contain" />
+            <img src="/uniroute-logo.png" alt="UniRoute" className="h-8 w-8 object-contain" />
             <div>
-              <h1 className="text-base font-extrabold tracking-tight text-sidebar-foreground">MU Transport</h1>
+              <h1 className="text-base font-extrabold tracking-tight text-sidebar-foreground">UniRoute</h1>
               <p className="text-xs text-sidebar-foreground/50">Admin Dashboard</p>
             </div>
           </div>
@@ -100,7 +100,7 @@ export default function AdminLayout({ activeView, onViewChange, children }: Admi
         {/* Header */}
         <header className="shrink-0 h-14 flex items-center justify-between px-5 border-b border-border bg-card shadow-sm">
           <h2 className="text-base font-bold tracking-tight text-card-foreground md:hidden flex items-center gap-2">
-            <img src="/metropolitan-logo.png" alt="MU" className="h-6 w-6 object-contain" /> MU Transport
+            <img src="/uniroute-logo.png" alt="UniRoute" className="h-6 w-6 object-contain" /> UniRoute
           </h2>
           <h2 className="text-base font-bold tracking-tight text-card-foreground hidden md:flex items-center gap-2">
             {navItems.find((n) => n.id === activeView)?.icon}
