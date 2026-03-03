@@ -416,8 +416,8 @@ const MapPage = () => {
         <div className="flex items-center justify-between px-4 h-14">
           {/* Left: logo */}
           <div className="flex items-center gap-2.5">
-            <img src="/metropolitan-logo.png" alt="MU" className="h-8 w-8 object-contain" />
-            <span className="text-base font-bold tracking-tight text-gray-900">MU Bus Tracker</span>
+            <img src="/uniroute-logo.png" alt="UniRoute" className="h-8 w-8 object-contain" />
+            <span className="text-base font-bold tracking-tight text-gray-900">UniRoute</span>
           </div>
 
           {/* Center: route filter (desktop only) */}

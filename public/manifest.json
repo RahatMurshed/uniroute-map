@@ -1,7 +1,7 @@
 {
-  "name": "MU Bus Tracker",
-  "short_name": "MU Bus",
-  "description": "Metropolitan University real-time bus tracking",
+  "name": "UniRoute",
+  "short_name": "UniRoute",
+  "description": "UniRoute real-time bus tracking",
   "start_url": "/map",
   "display": "standalone",
   "orientation": "portrait",
